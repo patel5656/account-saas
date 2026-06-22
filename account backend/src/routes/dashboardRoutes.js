@@ -4,6 +4,6 @@ const dashboardController = require('../controllers/dashboardController.js');
 const { verifyToken, requireRole } = require('../middlewares/authMiddleware.js');
 
 // Superadmin dashboard metrics
-router.get('/metrics', verifyToken, requireRole('SUPERADMIN'), dashboardController.getMetrics);
+router.get('/metrics', verifyToken, requireRole(['SUPERADMIN', 'COMPANY_ADMIN', 'STAFF']), dashboardController.getMetrics);
 
 module.exports = router;

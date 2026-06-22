@@ -22,7 +22,19 @@ const customerRoutes = require('./routes/customerRoutes.js');
 const invoiceRoutes = require('./routes/invoiceRoutes.js');
 const auditRoutes = require('./routes/auditRoutes.js');
 const dashboardRoutes = require('./routes/dashboardRoutes.js');
-
+const bankRoutes = require('./routes/bankRoutes.js');
+const employeeRoutes = require('./routes/employeeRoutes.js');
+const categoryRoutes = require('./routes/categoryRoutes.js');
+const expenseRoutes = require('./routes/expenseRoutes.js');
+const incomeRoutes = require('./routes/incomeRoutes.js');
+const paymentBookRoutes = require('./routes/paymentBookRoutes.js');
+const voucherRoutes = require('./routes/voucherRoutes.js');
+const bomRoutes = require('./routes/bomRoutes.js');
+const partyTagRoutes = require('./routes/partyTagRoutes.js');
+const partySettingRoutes = require('./routes/partySettingRoutes.js');
+const followupRoutes = require('./routes/followupRoutes.js');
+const warehouseRoutes = require('./routes/warehouseRoutes.js');
+const offerRoutes = require('./routes/offerRoutes.js');
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/companies', companyRoutes);
 app.use('/api/v1/plans', planRoutes);
@@ -31,6 +43,19 @@ app.use('/api/v1/customers', customerRoutes);
 app.use('/api/v1/invoices', invoiceRoutes);
 app.use('/api/v1/audit-logs', auditRoutes);
 app.use('/api/v1/dashboard', dashboardRoutes);
+app.use('/api/v1/banks', bankRoutes);
+app.use('/api/v1/employees', employeeRoutes);
+app.use('/api/v1/categories', categoryRoutes);
+app.use('/api/v1/expenses', expenseRoutes);
+app.use('/api/v1/incomes', incomeRoutes);
+app.use('/api/v1/payments', paymentBookRoutes);
+app.use('/api/v1/vouchers', voucherRoutes);
+app.use('/api/v1/boms', bomRoutes);
+app.use('/api/v1/party-tags', partyTagRoutes);
+app.use('/api/v1/party-settings', partySettingRoutes);
+app.use('/api/v1/followups', followupRoutes);
+app.use('/api/v1/warehouses', warehouseRoutes);
+app.use('/api/v1/offers', offerRoutes);
 
 // Error Handling Middleware
 app.use((err, req, res, next) => {

@@ -77,3 +77,32 @@ exports.updateStatus = async (req, res) => {
     res.status(500).json({ success: false, message: 'Server error' });
   }
 };
+
+exports.updateCompany = async (req, res) => {
+  const { id } = req.params;
+  const { name, ownerName, ownerEmail, planId } = req.body;
+  try {
+    const updatedCompany = await prisma.company.update({
+      where: { id: parseInt(id) },
+      data: { name, ownerName, ownerEmail, planId: planId ? parseInt(planId) : null },
+      include: { plan: true }
+    });
+    res.status(200).json({ success: true, message: 'Company updated', data: updatedCompany });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+exports.deleteCompany = async (req, res) => {
+  const { id } = req.params;
+  try {
+    // Delete associated users first if there's no cascade delete
+    await prisma.user.deleteMany({ where: { companyId: parseInt(id) } });
+    await prisma.company.delete({ where: { id: parseInt(id) } });
+    res.status(200).json({ success: true, message: 'Company deleted' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};

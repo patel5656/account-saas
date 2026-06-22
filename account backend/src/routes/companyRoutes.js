@@ -8,6 +8,8 @@ router.use(verifyToken, requireRole(['SUPERADMIN']));
 
 router.get('/', companyController.getAllCompanies);
 router.post('/', companyController.createCompany);
+router.put('/:id', companyController.updateCompany);
+router.delete('/:id', companyController.deleteCompany);
 router.patch('/:id/status', companyController.updateStatus);
 
 module.exports = router;
