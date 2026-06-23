@@ -165,3 +165,59 @@ exports.deleteProduct = async (req, res) => {
     res.status(500).json({ success: false, message: 'Server error' });
   }
 };
+
+// Merge two products
+exports.mergeProducts = async (req, res) => {
+  const companyId = req.user.companyId;
+  const { incorrectProductId, correctProductId } = req.body;
+
+  if (!incorrectProductId || !correctProductId) {
+    return res.status(400).json({ success: false, message: 'Missing product IDs' });
+  }
+  
+  if (incorrectProductId === correctProductId) {
+    return res.status(400).json({ success: false, message: 'Cannot merge a product into itself' });
+  }
+
+  try {
+    const incorrect = await prisma.product.findFirst({ where: { id: parseInt(incorrectProductId, 10), companyId } });
+    const correct = await prisma.product.findFirst({ where: { id: parseInt(correctProductId, 10), companyId } });
+
+    if (!incorrect || !correct) {
+      return res.status(404).json({ success: false, message: 'One or both products not found' });
+    }
+
+    // Run within a transaction to ensure data integrity
+    await prisma.$transaction(async (tx) => {
+      // 1. Update Invoice items
+      await tx.invoiceItem.updateMany({
+        where: { productId: incorrect.id },
+        data: { productId: correct.id }
+      });
+
+      // 2. Update Bom items
+      await tx.bomItem.updateMany({
+        where: { productId: incorrect.id },
+        data: { productId: correct.id }
+      });
+
+      // 3. Add stock from incorrect to correct
+      await tx.product.update({
+        where: { id: correct.id },
+        data: {
+          stock: correct.stock + incorrect.stock
+        }
+      });
+
+      // 4. Delete incorrect product
+      await tx.product.delete({
+        where: { id: incorrect.id }
+      });
+    });
+
+    res.status(200).json({ success: true, message: 'Products merged successfully' });
+  } catch (error) {
+    console.error('Merge Products Error:', error);
+    res.status(500).json({ success: false, message: 'Server error during merge' });
+  }
+};

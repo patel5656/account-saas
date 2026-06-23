@@ -35,6 +35,8 @@ const partySettingRoutes = require('./routes/partySettingRoutes.js');
 const followupRoutes = require('./routes/followupRoutes.js');
 const warehouseRoutes = require('./routes/warehouseRoutes.js');
 const offerRoutes = require('./routes/offerRoutes.js');
+const unitRoutes = require('./routes/unitRoutes.js');
+const unitConversionRoutes = require('./routes/unitConversionRoutes.js');
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/companies', companyRoutes);
 app.use('/api/v1/plans', planRoutes);
@@ -56,6 +58,8 @@ app.use('/api/v1/party-settings', partySettingRoutes);
 app.use('/api/v1/followups', followupRoutes);
 app.use('/api/v1/warehouses', warehouseRoutes);
 app.use('/api/v1/offers', offerRoutes);
+app.use('/api/v1/units', unitRoutes);
+app.use('/api/v1/unit-conversions', unitConversionRoutes);
 
 // Error Handling Middleware
 app.use((err, req, res, next) => {

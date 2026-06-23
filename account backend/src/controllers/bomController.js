@@ -75,27 +75,31 @@ exports.updateBom = async (req, res) => {
   const { id } = req.params;
   const { name, isActive, items } = req.body;
   try {
-    // Delete existing items first
-    await prisma.bomItem.deleteMany({
-      where: { bomId: parseInt(id, 10) }
-    });
+    const updateData = {
+      isActive: isActive !== false
+    };
+    if (name !== undefined) updateData.name = name;
+
+    if (items !== undefined) {
+      // Delete existing items first only if we are updating items
+      await prisma.bomItem.deleteMany({
+        where: { bomId: parseInt(id, 10) }
+      });
+      updateData.items = {
+        create: items.map(item => ({
+          productId: parseInt(item.productId, 10),
+          quantity: parseFloat(item.quantity) || 1,
+          unit: item.unit || 'Units',
+          salePrice: parseFloat(item.salePrice) || 0,
+          mrp: parseFloat(item.mrp) || 0,
+          wholesale: parseFloat(item.wholesale) || 0
+        }))
+      };
+    }
 
     const bom = await prisma.bom.update({
       where: { id: parseInt(id, 10), companyId },
-      data: {
-        name,
-        isActive: isActive !== false,
-        items: {
-          create: (items || []).map(item => ({
-            productId: parseInt(item.productId, 10),
-            quantity: parseFloat(item.quantity) || 1,
-            unit: item.unit || 'Units',
-            salePrice: parseFloat(item.salePrice) || 0,
-            mrp: parseFloat(item.mrp) || 0,
-            wholesale: parseFloat(item.wholesale) || 0
-          }))
-        }
-      },
+      data: updateData,
       include: {
         items: true
       }
