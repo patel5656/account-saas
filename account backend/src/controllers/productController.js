@@ -27,7 +27,8 @@ exports.createProduct = async (req, res) => {
     tax, hsnCode, purchasePrice, wholesalePrice, creditSalePrice, baseUnit, purchaseUnit, salesUnit,
     lowStockAlert, reorderLevel, enableBatch, enableExpiry, enableImei, hasBom, qtySlabs,
     openingStockRate, warehouse, bomName, isMultiLevel, bomRecipe,
-    syncOnline, onlineProductName, onlineProductDesc, onlineSalePrice, ecommerceCategory, productImage
+    syncOnline, onlineProductName, onlineProductDesc, onlineSalePrice, ecommerceCategory, productImage,
+    commissionType, size, colour, expiryMonth, location, hindiName, description, termsCondition, productTags
   } = req.body;
   try {
     const product = await prisma.product.create({
@@ -68,6 +69,15 @@ exports.createProduct = async (req, res) => {
         onlineSalePrice: parseFloat(onlineSalePrice) || 0,
         ecommerceCategory,
         productImage,
+        commissionType,
+        size,
+        colour,
+        expiryMonth,
+        location,
+        hindiName,
+        description,
+        termsCondition,
+        productTags,
         companyId 
       }
     });
@@ -90,7 +100,8 @@ exports.updateProduct = async (req, res) => {
     tax, hsnCode, purchasePrice, wholesalePrice, creditSalePrice, baseUnit, purchaseUnit, salesUnit,
     lowStockAlert, reorderLevel, enableBatch, enableExpiry, enableImei, hasBom, qtySlabs,
     openingStockRate, warehouse, bomName, isMultiLevel, bomRecipe,
-    syncOnline, onlineProductName, onlineProductDesc, onlineSalePrice, ecommerceCategory, productImage
+    syncOnline, onlineProductName, onlineProductDesc, onlineSalePrice, ecommerceCategory, productImage,
+    commissionType, size, colour, expiryMonth, location, hindiName, description, termsCondition, productTags
   } = req.body;
   try {
     const existing = await prisma.product.findUnique({ where: { id: parseInt(id, 10) } });
@@ -136,7 +147,16 @@ exports.updateProduct = async (req, res) => {
         ...(onlineProductDesc !== undefined && { onlineProductDesc }),
         ...(onlineSalePrice !== undefined && { onlineSalePrice: parseFloat(onlineSalePrice) }),
         ...(ecommerceCategory !== undefined && { ecommerceCategory }),
-        ...(productImage !== undefined && { productImage })
+        ...(productImage !== undefined && { productImage }),
+        ...(commissionType !== undefined && { commissionType }),
+        ...(size !== undefined && { size }),
+        ...(colour !== undefined && { colour }),
+        ...(expiryMonth !== undefined && { expiryMonth }),
+        ...(location !== undefined && { location }),
+        ...(hindiName !== undefined && { hindiName }),
+        ...(description !== undefined && { description }),
+        ...(termsCondition !== undefined && { termsCondition }),
+        ...(productTags !== undefined && { productTags })
       }
     });
     res.status(200).json({ success: true, data: product });

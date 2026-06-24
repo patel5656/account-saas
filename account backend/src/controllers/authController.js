@@ -3,6 +3,71 @@ const prisma = new PrismaClient();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
+exports.register = async (req, res) => {
+  const { name, email, password, companyName } = req.body;
+
+  try {
+    const existingUser = await prisma.user.findUnique({ where: { email } });
+    if (existingUser) {
+      return res.status(400).json({ success: false, message: 'Email already in use' });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // Create Company and User in a transaction
+    const result = await prisma.$transaction(async (tx) => {
+      const company = await tx.company.create({
+        data: {
+          name: companyName || 'My Company',
+          ownerName: name,
+          ownerEmail: email,
+          status: 'ACTIVE'
+        }
+      });
+
+      // Provide default settings for the new company
+      await tx.companySetting.create({
+        data: { companyId: company.id }
+      });
+
+      const user = await tx.user.create({
+        data: {
+          name,
+          email,
+          password: hashedPassword,
+          role: 'COMPANY_ADMIN',
+          companyId: company.id
+        }
+      });
+
+      return { company, user };
+    });
+
+    const tokenPayload = {
+      id: result.user.id,
+      role: result.user.role,
+      companyId: result.user.companyId
+    };
+
+    const token = jwt.sign(tokenPayload, process.env.JWT_SECRET, { expiresIn: '24h' });
+
+    res.status(201).json({
+      success: true,
+      token,
+      user: {
+        id: result.user.id,
+        name: result.user.name,
+        role: result.user.role,
+        companyId: result.user.companyId
+      }
+    });
+
+  } catch (error) {
+    console.error("Register Error: ", error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
 exports.login = async (req, res) => {
   const { email, password } = req.body;
 

@@ -34,9 +34,12 @@ model Company {
   partyTags  PartyTag[]
   partySetting PartySetting?
   warehouses Warehouse[]
+  branches   Branch[]
   offers     Offer[]
+  companySetting CompanySetting?
   units      Unit[]
   unitConversions UnitConversion[]
+  loadingSheets LoadingSheet[]
 }
 
 enum CompanyStatus {
@@ -110,6 +113,15 @@ model Product {
   onlineSalePrice Float?        @default(0)
   ecommerceCategory String?
   productImage    String?       @db.LongText
+  commissionType  String?
+  size            String?
+  colour          String?
+  expiryMonth     String?
+  location        String?
+  hindiName       String?
+  description     String?       @db.Text
+  termsCondition  String?       @db.Text
+  productTags     String?
   companyId       Int
   company      Company       @relation(fields: [companyId], references: [id])
   invoiceItems InvoiceItem[]
@@ -165,10 +177,23 @@ model Followup {
   updatedAt    DateTime @updatedAt
 }
 
+enum TransactionType {
+  PURCHASE_ORDER
+  PURCHASE
+  PURCHASE_RETURN
+  SALES
+  SALES_RETURN
+  CHALLAN
+  STOCK_TRANSFER
+  QUOTATION
+  ADJUSTMENT
+}
+
 model Invoice {
   id             Int           @id @default(autoincrement())
   invoiceNo      String
   date           DateTime      @default(now())
+  type           TransactionType @default(SALES)
   subTotal       Float         @default(0)
   totalDiscount  Float         @default(0)
   freightCharges Float         @default(0)
@@ -178,9 +203,12 @@ model Invoice {
   status         String        @default("PAID")
   companyId      Int
   company        Company       @relation(fields: [companyId], references: [id])
-  customerId     Int
-  customer       Customer      @relation(fields: [customerId], references: [id])
+  customerId     Int?
+  customer       Customer?     @relation(fields: [customerId], references: [id])
+  warehouseId    Int?
+  toWarehouseId  Int?
   items          InvoiceItem[]
+  loadingSheetItems LoadingSheetItem[]
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 }
@@ -360,6 +388,20 @@ model Warehouse {
   updatedAt DateTime @updatedAt
 }
 
+model Branch {
+  id        Int      @id @default(autoincrement())
+  name      String
+  code      String?
+  contact   String?
+  gstin     String?
+  address   String?
+  isActive  Boolean  @default(true)
+  companyId Int
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 model Offer {
   id              Int      @id @default(autoincrement())
   name            String
@@ -408,6 +450,117 @@ model UnitConversion {
   isActive    Boolean  @default(true)
   companyId   Int
   company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model CompanySetting {
+  id                  Int      @id @default(autoincrement())
+  quickProduct        Boolean  @default(false)
+  partyFirst          Boolean  @default(false)
+  showShippingParty   Boolean  @default(false)
+  showCompany         Boolean  @default(false)
+  showProductCode     Boolean  @default(false)
+  showBatchNo         Boolean  @default(false)
+  compulsoryBatchNo   Boolean  @default(false)
+  showGST             Boolean  @default(false)
+  showHSN             Boolean  @default(false)
+  showMRP             Boolean  @default(false)
+  showListPrice       Boolean  @default(false)
+  showPurchasePrice   Boolean  @default(false)
+  showDiscount        Boolean  @default(false)
+  hideTotalDiscount   Boolean  @default(false)
+  hideFreightCharge   Boolean  @default(false)
+  showPriceFirst      Boolean  @default(false)
+  showUnit            Boolean  @default(false)
+  showWarning         Boolean  @default(false)
+  negativeStockLock   Boolean  @default(false)
+  useProductCode      Boolean  @default(false)
+  useBarcode          Boolean  @default(false)
+  usePoints           Boolean  @default(false)
+  
+  whatsapp            Boolean  @default(false)
+  sendWhatsapp        Boolean  @default(false)
+  sendSms             Boolean  @default(false)
+  mergePartyLedger    Boolean  @default(false)
+  partyTypeBoth       Boolean  @default(false)
+  interestOnInvoices  Boolean  @default(false)
+  voucherHead         String?
+  showCustomerChallan Boolean  @default(true)
+  showCustomerInvoice Boolean  @default(false)
+  showPurchaseOrder   Boolean  @default(true)
+  showSalesOrder      Boolean  @default(false)
+  currency            String?
+  whatsappHost        String?
+  
+  lowStockQty         Int      @default(5)
+  languagePreference  String   @default("en")
+  invoiceLayout       String   @default("default")
+  taxDisplayOption    String   @default("EXCLUSIVE")
+  barcodeMode         String   @default("MANUAL")
+  defaultQuantity     Int      @default(1)
+  defaultWarehouseId  Int?
+  defaultTerms        String?  @db.Text
+  remarkSettings      String?  @db.Text
+
+  // Product Master Settings
+  extraColumnsName        String?   @default("")
+  extraColumnsDefault     String?   @default("")
+  defaultCommission       String?   @default("Normal")
+  barcodeHeads            String?   @default("* M")
+  showSubInventory        Boolean   @default(false)
+  showProductCodeField    Boolean   @default(false)
+  showBrandField          Boolean   @default(false)
+  showCategoryField       Boolean   @default(true)
+  showGstApplicableField  Boolean   @default(true)
+  showHsnField            Boolean   @default(true)
+  showCreditSalePrice     Boolean   @default(false)
+  showWholesalePrice      Boolean   @default(false)
+  showSpecialPrice        Boolean   @default(false)
+  showSuperSpecialPrice   Boolean   @default(false)
+  showOpeningStock        Boolean   @default(false)
+  showMinimumQuantity     Boolean   @default(false)
+  showReorderQuantity     Boolean   @default(false)
+  showAutoQuantity        Boolean   @default(false)
+  showMultiLocation       Boolean   @default(false)
+  showUnitSection         Boolean   @default(true)
+  showBarcodeField        Boolean   @default(true)
+  showPurchasePriceCode   Boolean   @default(true)
+  purchasePriceMarkup     Float     @default(0)
+  purchasePriceCodeMap    String?   @default("OABCDEFGHI")
+
+  companyId           Int      @unique
+  company             Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+}
+
+model LoadingSheet {
+  id          Int      @id @default(autoincrement())
+  sheetNo     String
+  date        DateTime @default(now())
+  status      String   @default("GENERATED")
+  companyId   Int
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  items       LoadingSheetItem[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model LoadingSheetItem {
+  id              Int      @id @default(autoincrement())
+  loadingSheetId  Int
+  loadingSheet    LoadingSheet @relation(fields: [loadingSheetId], references: [id], onDelete: Cascade)
+  invoiceId       Int
+  invoice         Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+}
+
+model Currency {
+  id          Int      @id @default(autoincrement())
+  code        String   @unique
+  symbol      String?
+  name        String
+  isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }

@@ -37,9 +37,101 @@ exports.getMetrics = async (req, res) => {
     const totalProducts = await prisma.product.count({ where: { companyId } });
     const totalInvoicesCount = await prisma.invoice.count({ where: { companyId } });
     
-    // Calculate total sales
-    const invoices = await prisma.invoice.findMany({ where: { companyId }, select: { totalAmount: true } });
-    const totalSales = invoices.reduce((sum, inv) => sum + inv.totalAmount, 0);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    // Sales
+    const salesAgg = await prisma.invoice.aggregate({
+      _sum: { totalAmount: true },
+      where: { companyId, type: 'SALES', date: { gte: today, lt: tomorrow } }
+    });
+    const todaysSale = salesAgg._sum.totalAmount || 0;
+
+    // Purchase
+    const purchaseAgg = await prisma.invoice.aggregate({
+      _sum: { totalAmount: true },
+      where: { companyId, type: 'PURCHASE', date: { gte: today, lt: tomorrow } }
+    });
+    const todayPurchase = purchaseAgg._sum.totalAmount || 0;
+
+    // Stock
+    const stockAgg = await prisma.product.aggregate({
+      _sum: { stock: true },
+      where: { companyId }
+    });
+    const currentStockStatus = stockAgg._sum.stock || 0;
+
+    // Outstanding
+    const custOutAgg = await prisma.customer.aggregate({
+      _sum: { balance: true },
+      where: { companyId, type: 'CUSTOMER' }
+    });
+    const customerOutstanding = custOutAgg._sum.balance || 0;
+
+    const compOutAgg = await prisma.customer.aggregate({
+      _sum: { balance: true },
+      where: { companyId, type: 'SUPPLIER' }
+    });
+    const companyOutstanding = compOutAgg._sum.balance || 0;
+
+    // Bank
+    const bankAgg = await prisma.bank.aggregate({
+      _sum: { balance: true },
+      where: { companyId }
+    });
+    const allAccountsBalance = bankAgg._sum.balance || 0;
+
+    // --- Chart Data (Last 30 Days Sales) ---
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const salesInvoices = await prisma.invoice.findMany({
+      where: { companyId, type: 'SALES', date: { gte: thirtyDaysAgo } },
+      select: { date: true, totalAmount: true }
+    });
+    const salesByDate = {};
+    salesInvoices.forEach(inv => {
+      const d = new Date(inv.date);
+      const dateStr = d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' }).replace(/ /g, '-');
+      salesByDate[dateStr] = (salesByDate[dateStr] || 0) + inv.totalAmount;
+    });
+    const chartData = Object.keys(salesByDate).map(date => ({
+      name: date,
+      sales: salesByDate[date]
+    })).sort((a, b) => new Date(a.name) - new Date(b.name));
+
+    // --- Alert Cards Data ---
+    const allProductsList = await prisma.product.findMany({ 
+      where: { companyId }, 
+      select: { stock: true, reorderLevel: true, expiryMonth: true } 
+    });
+    let reorderCount = 0;
+    let expiredCount = 0;
+    const now = new Date();
+    const currentMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    allProductsList.forEach(p => {
+      if (p.stock <= p.reorderLevel) reorderCount++;
+      if (p.expiryMonth && p.expiryMonth < currentMonthStr) expiredCount++;
+    });
+
+    const remindersCount = await prisma.followup.count({
+      where: { customer: { companyId } }
+    });
+
+    const todayCashSales = await prisma.invoice.aggregate({
+      _sum: { totalAmount: true },
+      where: { companyId, type: 'SALES', paymentMode: 'Cash', date: { gte: today, lt: tomorrow } }
+    });
+    const todayCashPurchases = await prisma.invoice.aggregate({
+      _sum: { totalAmount: true },
+      where: { companyId, type: 'PURCHASE', paymentMode: 'Cash', date: { gte: today, lt: tomorrow } }
+    });
+    const cashIn = todayCashSales._sum.totalAmount || 0;
+    const cashOut = todayCashPurchases._sum.totalAmount || 0;
+    const txnsCount = await prisma.invoice.count({
+      where: { companyId, date: { gte: today, lt: tomorrow } }
+    });
 
     res.status(200).json({
       success: true,
@@ -47,7 +139,28 @@ exports.getMetrics = async (req, res) => {
         totalCustomers,
         totalProducts,
         totalInvoices: totalInvoicesCount,
-        totalSales
+        todaysSale,
+        todayPurchase,
+        currentStockStatus,
+        todaysExpenses: 0,
+        customerOutstanding,
+        companyOutstanding,
+        allAccountsBalance,
+        recycleBin: 0,
+        chartData,
+        alerts: {
+          expiredCount,
+          reorderCount,
+          remindersCount,
+          daybook: {
+            receipts: cashIn,
+            payments: cashOut,
+            cashIn,
+            cashOut,
+            balance: cashIn - cashOut,
+            txnsCount
+          }
+        }
       }
     });
   } catch (error) {

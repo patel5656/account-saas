@@ -109,3 +109,38 @@ exports.createInvoice = async (req, res) => {
     res.status(400).json({ success: false, message });
   }
 };
+
+/**
+ * Get all invoices or filter by type
+ */
+exports.getInvoices = async (req, res) => {
+  const companyId = req.user.companyId;
+  const { type } = req.query;
+
+  try {
+    const whereClause = { companyId };
+    if (type) {
+      whereClause.type = type;
+    }
+
+    const invoices = await prisma.invoice.findMany({
+      where: whereClause,
+      include: {
+        customer: true,
+        items: {
+          include: {
+            product: true
+          }
+        }
+      },
+      orderBy: {
+        date: 'desc'
+      }
+    });
+
+    res.status(200).json({ success: true, data: invoices });
+  } catch (error) {
+    console.error('Error fetching invoices:', error);
+    res.status(400).json({ success: false, message: error.message || 'Server error' });
+  }
+};
