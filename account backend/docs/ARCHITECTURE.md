@@ -18,11 +18,23 @@ Routes → Controllers → Services → Prisma → MySQL
 
 ## Database & Environment Configuration
 
-- **Unified Schema**: There is only one Prisma schema. No separate local or production schemas exist.
-- **Environment Variables**: The database connection string is strictly loaded from the `DATABASE_URL` environment variable.
+- **Unified Schema**: There is only one Prisma schema (`schema.prisma`). No separate local or production schemas exist, and no local-only generators (like SQLite) are used.
+- **Environment Variables**: The database connection string is strictly loaded from the `DATABASE_URL` environment variable. The Express app listens on `process.env.PORT` (fallback 3000 allowed locally). Other critical variables include `JWT_SECRET` and optional payment keys.
   - **Local**: `DATABASE_URL="mysql://root:password@localhost:3306/erp_db"`
-  - **Railway**: Uses the automatically injected `DATABASE_URL` provided by the Railway MySQL plugin.
-- **No Hardcoding**: No host, port, or credentials are ever hardcoded in the application code.
+  - **Railway**: Uses the automatically injected `DATABASE_URL` provided by the Railway MySQL plugin. Railway deployment requires zero code changes.
+- **No Hardcoding**: No host, port, or credentials (no mock data) are ever hardcoded in the application code.
+- **No Environment-Specific Branching**: The codebase behaves identically across all environments. Environment variables alone control connections and ports.
+
+## Multi-Tenant Architecture
+The architecture guarantees multi-tenancy at the database level. Every transactional and master data table (e.g., `Product`, `Invoice`, `Customer`, `CompanySetting`) includes a `companyId` column. 
+- The `companyId` is extracted from the user's JWT upon authentication.
+- Every Prisma query must automatically append `where: { companyId }` to ensure data isolation.
+
+## Database Indexing Strategy
+To ensure high performance and maintain data integrity in a multi-tenant environment, the database schema strictly follows these indexing patterns:
+1. **Tenant-Level Indexes:** Every core table must be indexed on `companyId` to optimize the mandatory isolation queries.
+2. **Composite Uniqueness:** Logical uniqueness is scoped per tenant. For example, `@@unique([sku, companyId])` on the `Product` model ensures SKUs are unique *within* a company, but allows identical SKUs across different companies in the SaaS.
+3. **Foreign Key Optimization:** Prisma inherently indexes relational foreign keys (e.g., `customerId`, `warehouseId`). This accelerates JOIN equivalents and ensures atomic `$transaction` operations execute swiftly.
 
 ## Connection Lifecycle
 
@@ -41,7 +53,7 @@ Transactions (`prisma.$transaction`) are heavily utilized to ensure atomicity, p
 1. Environment variables are loaded (`dotenv`).
 2. The Express server initializes.
 3. Prisma Client connects to the MySQL database (validating the `DATABASE_URL`).
-4. The server begins listening on the designated `PORT` (defaulting to 5000 if not specified by the environment).
+4. The server begins listening on the designated `process.env.PORT` (fallback 3000 allowed locally).
 
 ### Shutdown
 1. Intercept `SIGINT` or `SIGTERM` signals.

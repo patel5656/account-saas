@@ -27,6 +27,7 @@ model Company {
   employees  Employee[]
   categories Category[]
   expenses   Expense[]
+  expenseTransactions ExpenseTransaction[]
   incomes    Income[]
   payments   PaymentBook[]
   vouchers   Voucher[]
@@ -40,6 +41,11 @@ model Company {
   units      Unit[]
   unitConversions UnitConversion[]
   loadingSheets LoadingSheet[]
+  attendances   Attendance[]
+  productTags   ProductTag[]
+  commissionTypes CommissionType[]
+  bankTransactions BankTransaction[]
+  paymentBookTransactions PaymentBookTransaction[]
 }
 
 enum CompanyStatus {
@@ -250,6 +256,8 @@ model Bank {
   accountNo String?
   companyId Int
   company   Company  @relation(fields: [companyId], references: [id])
+  transfersFrom BankTransaction[] @relation("BankTransfersFrom")
+  transfersTo   BankTransaction[] @relation("BankTransfersTo")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -269,8 +277,23 @@ model Employee {
   commissionOnManufacturing  Float    @default(0)
   companyId                  Int
   company                    Company  @relation(fields: [companyId], references: [id])
+  attendances                Attendance[]
   createdAt                  DateTime @default(now())
   updatedAt                  DateTime @updatedAt
+}
+
+model Attendance {
+  id          Int      @id @default(autoincrement())
+  date        DateTime
+  status      String   @default("Present")
+  employeeId  Int
+  employee    Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  companyId   Int
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([employeeId, date])
 }
 
 model Category {
@@ -291,10 +314,27 @@ model Expense {
   head      String
   type      String
   isActive  Boolean  @default(true)
+  balance   Float    @default(0)
   companyId Int
   company   Company  @relation(fields: [companyId], references: [id])
+  transactions ExpenseTransaction[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model ExpenseTransaction {
+  id            Int      @id @default(autoincrement())
+  date          DateTime @default(now())
+  expenseAmount Float    @default(0)
+  paidAmount    Float    @default(0)
+  discount      Float    @default(0)
+  remark        String?
+  expenseId     Int
+  expense       Expense  @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  companyId     Int
+  company       Company  @relation(fields: [companyId], references: [id])
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 }
 
 model Income {
@@ -316,6 +356,7 @@ model PaymentBook {
   isActive     Boolean  @default(true)
   companyId    Int
   company      Company  @relation(fields: [companyId], references: [id])
+  transactions PaymentBookTransaction[]
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 }
@@ -356,6 +397,26 @@ model BomItem {
 }
 
 model PartyTag {
+  id        Int      @id @default(autoincrement())
+  name      String
+  isActive  Boolean  @default(true)
+  companyId Int
+  company   Company  @relation(fields: [companyId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ProductTag {
+  id        Int      @id @default(autoincrement())
+  name      String
+  isActive  Boolean  @default(true)
+  companyId Int
+  company   Company  @relation(fields: [companyId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model CommissionType {
   id        Int      @id @default(autoincrement())
   name      String
   isActive  Boolean  @default(true)
@@ -565,3 +626,33 @@ model Currency {
   updatedAt   DateTime @updatedAt
 }
 
+model BankTransaction {
+  id           Int      @id @default(autoincrement())
+  date         DateTime @default(now())
+  amount       Float    @default(0)
+  bankCharges  Float    @default(0)
+  remark       String?
+  fromBankId   Int?
+  toBankId     Int?
+  companyId    Int
+  company      Company  @relation(fields: [companyId], references: [id])
+  fromBank     Bank?    @relation("BankTransfersFrom", fields: [fromBankId], references: [id], onDelete: Cascade)
+  toBank       Bank?    @relation("BankTransfersTo", fields: [toBankId], references: [id], onDelete: Cascade)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model PaymentBookTransaction {
+  id             Int          @id @default(autoincrement())
+  date           DateTime     @default(now())
+  paymentIn      Float        @default(0)
+  paymentOut     Float        @default(0)
+  discount       Float        @default(0)
+  remark         String?
+  paymentBookId  Int
+  paymentBook    PaymentBook  @relation(fields: [paymentBookId], references: [id], onDelete: Cascade)
+  companyId      Int
+  company        Company      @relation(fields: [companyId], references: [id])
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+}

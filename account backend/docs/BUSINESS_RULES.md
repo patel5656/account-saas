@@ -4,8 +4,12 @@ This document defines the strict operational rules governing the system's logic.
 
 ## Authentication & Authorization Rules
 - **Authentication**: All API requests (except login/registration) must contain a valid JWT in the `Authorization: Bearer <token>` header.
-- **Role-Based Access**: Certain destructive actions (e.g., deleting a warehouse or branch) require specific roles (e.g., `COMPANY_ADMIN`).
-- **Data Isolation**: A user can only fetch, modify, or delete records associated with their assigned `companyId` and `branchId`.
+- **Token Expiration & Refresh Flow**: 
+  - Access tokens (JWT) are short-lived (e.g., 15-60 minutes) to mitigate credential theft.
+  - Clients must maintain sessions by requesting new access tokens via a long-lived, HTTP-only Refresh Token.
+  - If the refresh token expires or is manually revoked by an admin, the system must force a Hard Logout.
+- **Role-Based Access**: Destructive actions and global settings require specific roles (Superadmin, Admin). Staff role is restricted to daily transactional entries.
+- **Data Isolation**: Multi-tenant architecture dictates that a user can only fetch, modify, or delete records exactly matching their assigned `companyId`. This is strictly enforced in every Prisma database query.
 
 ## Validation Rules
 - **Duplicate Prevention**: Entities like Company, Branch, User, and Product require unique identifiers (e.g., email, GSTIN, product code). The backend must return a 409 Conflict if duplicates are detected.
@@ -41,8 +45,19 @@ Financial tracking runs parallel to inventory movements but responds only to spe
 - **No Accounting Entry**: Creating or fulfilling a loading sheet has zero financial impact.
 - **No Ownership Change**: Stock remains under company ownership until the actual Sales Invoice is marked as fulfilled/delivered, depending on the organizational workflow.
 
+## Product Master & Settings Rules
+- **Pricing Tiers**: The system supports multiple pricing tiers (MRP, Credit Sale Price, Wholesale Price) which dictate default amounts on the POS screen.
+- **Commission & HSN**: `commissionType` and `hsnCode` must strictly map to defined financial/tax ledgers.
+- **Units**: Transactions enforce conversions if a product is sold in `salesUnit` but inventoried in `baseUnit`.
+- **Purchase Price Masking**: `purchasePriceCodeMap` parses obfuscated cost representations (e.g., "OABCDEFGHI") to prevent customer visibility on POS.
+- **Sub Inventory**: When `showSubInventory` is active, stock deductions are verified per localized batch or color variant.
+
+## POS / Cart & Payment Rules
+- **Cart Validation**: Adding to the cart instantly runs stock validation (unless `negativeStockLock` is FALSE).
+- **Payment Modes**: The checkout supports multi-mode split payments (e.g., partial cash, partial card). The backend must correctly split these into the appropriate bank/cash ledgers.
+
 ## Settings & Configuration Rules
-The system behaviors (especially in the Purchase Order and Sales screens) are driven entirely by dynamic backend settings, preventing UI hardcoding.
+The system behaviors (especially in the POS, Purchase Order, and Sales screens) are driven entirely by dynamic backend settings, preventing UI hardcoding.
 
 - **Overrides**: Settings follow a hierarchy. User-specific settings override Branch-specific settings, which override Company-specific defaults.
 - **Database Persistence**: Settings (e.g., `Show GST`, `Party First`, `Default Warehouse`) must be fetched from the database on UI load.

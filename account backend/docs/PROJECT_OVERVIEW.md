@@ -1,14 +1,29 @@
 # Project Overview
 
-This document provides a high-level overview of the backend ERP system built using Node.js, Express.js, Prisma ORM, and MySQL. The backend is designed for local development and future Railway deployment using the same codebase, ensuring seamless transitions with zero code changes.
+This document provides a high-level overview of the backend POS + Accounting SaaS system built using Node.js, Express.js, Prisma ORM, and MySQL. The backend is designed for local development using Prisma and a local MySQL instance, and future Railway deployment utilizing the Railway MySQL plugin, using the exact same codebase. This ensures seamless transitions with zero code changes. No hard-coded or mock data is used; all configurations rely strictly on environment variables.
+
+### Multi-Tenant Architecture
+The system enforces strict multi-tenancy. Every core module and data table contains a `companyId` to guarantee data isolation between different tenant companies.
 
 ## Core Modules
 
 ### 1. Authentication
-Handles user login, token generation (JWT), and role-based access control. Secures all endpoints and ensures data isolation across companies and branches.
+Handles user login, token generation (JWT), and role-based access control (Superadmin, Company Admin, Staff). Secures all endpoints and ensures data isolation across companies and branches using the mandatory `companyId`.
 
-### 2. Dashboard
-Aggregates summary metrics across sales, purchases, collections, and inventory to provide a real-time overview of business performance.
+### 2. Dashboard & Account Summary
+Aggregates summary metrics across sales, purchases, collections, inventory, and account balances to provide a real-time overview of business performance.
+
+### 2a. POS / Billing (Point of Sale)
+Dedicated frontend-driven module for rapid retail billing. Supports:
+- Cart management and quick item selection.
+- Multiple payment modes (Cash, Bank, Credit).
+- Seamless integration with inventory to deduct stock instantly.
+
+### 2b. Product Master & Product Settings
+Comprehensive product management including:
+- Commission types, HSN, Barcode, Sub Inventory tracking, and multi-tier Sale Prices.
+- Support for base, purchase, and sales units with conversions.
+- Advanced settings like purchase price code parsing and automated markups.
 
 ### 3. Masters
 Core entities that power the transactional modules.
@@ -38,8 +53,8 @@ Handles the flow of money.
 - **Sales**: Creates a receivable entry against the customer.
 - **Collection Reports**: Aggregates all incoming (Money In) and outgoing (Money Out) payments to calculate net collections and account balances.
 
-### 8. Reports
-Comprehensive data extraction across inventory, sales, purchases, and financials for auditing and business intelligence.
+### 8. Reports & Audit Logs
+Comprehensive data extraction across inventory, sales, purchases, Bill Book, and financials. Audit logs track every critical user action per `companyId` for security and compliance.
 
 ### 9. Settings
 Extensive configuration module allowing overriding of default behaviors at the Company, Branch, or User level. Controls UI visibility (e.g., Show GST, Show MRP), default rules (e.g., Default Warehouse), and feature flags (e.g., Quick Product entry).

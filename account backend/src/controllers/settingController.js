@@ -10,11 +10,18 @@ exports.getSettings = async (req, res) => {
       where: { companyId }
     });
 
-    // If no settings exist yet, return a default object or create it on the fly
+    // If no settings exist yet, return a safe default object without trying to create
     if (!settings) {
-      settings = await prisma.companySetting.create({
-        data: { companyId }
-      });
+      settings = {
+        companyId,
+        printHeader: null,
+        printFooter: null,
+        showLogo: true,
+        paperSize: 'A4',
+        fontSize: 'medium',
+        currency: 'INR',
+        dateFormat: 'DD-MM-YYYY',
+      };
     }
 
     res.status(200).json({ success: true, data: settings });

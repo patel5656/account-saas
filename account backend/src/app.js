@@ -43,6 +43,11 @@ const financialRoutes = require('./routes/financialRoutes.js');
 const branchRoutes = require('./routes/branchRoutes.js');
 const loadingSheetRoutes = require('./routes/loadingSheetRoutes.js');
 const currencyRoutes = require('./routes/currencyRoutes.js');
+const posRoutes = require('./routes/posRoutes.js');
+const productTagRoutes = require('./routes/productTagRoutes.js');
+const commissionTypeRoutes = require('./routes/commissionTypeRoutes.js');
+const ledgerRoutes = require('./routes/ledgerRoutes.js');
+
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/companies', companyRoutes);
 app.use('/api/v1/plans', planRoutes);
@@ -72,6 +77,10 @@ app.use('/api/v1/financial', financialRoutes);
 app.use('/api/v1/branches', branchRoutes);
 app.use('/api/v1/loading-sheet', loadingSheetRoutes);
 app.use('/api/v1/currencies', currencyRoutes);
+app.use('/api/v1/pos', posRoutes);
+app.use('/api/v1/product-tags', productTagRoutes);
+app.use('/api/v1/commission-types', commissionTypeRoutes);
+app.use('/api/v1/ledger', ledgerRoutes);
 
 // Error Handling Middleware
 app.use((err, req, res, next) => {

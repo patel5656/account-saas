@@ -53,11 +53,27 @@ For all `GET` lists (e.g., `/users`, `/sales`):
 ### Companies & Branches
 - `GET /companies` | `POST /companies` | `PUT /companies/:id`
 - `GET /branches` | `POST /branches` | `PUT /branches/:id` | `DELETE /branches/:id`
-  - Auth: Required. Returns isolated data based on token.
+  - Auth: Required. Role: Superadmin/Admin. Returns isolated data based on token (`companyId`).
 
 ### Warehouses
 - `GET /warehouses` | `POST /warehouses` | `PUT /warehouses/:id` | `DELETE /warehouses/:id`
-  - Auth: Required.
+  - Auth: Required. Role: Admin/Staff.
+
+### Product Master & Settings
+- `GET /products` | `POST /products` | `PUT /products/:id` | `DELETE /products/:id`
+  - Auth: Required. Role: Admin/Staff.
+  - Body Params: `name`, `sku`, `barcode`, `commissionType`, `hsnCode`, `baseUnit`, `purchaseUnit`, `salesUnit`, `creditSalePrice`, `wholesalePrice`, `purchasePrice`.
+  - Enforces `companyId` isolation. Standard errors apply.
+- `GET /units` | `POST /units` | `PUT /units/:id` | `DELETE /units/:id`
+  - Auth: Required. Manages base units.
+- `GET /unit-conversions` | `POST /unit-conversions` | `PUT /unit-conversions/:id` | `DELETE /unit-conversions/:id`
+  - Auth: Required. Maps `baseQty` to `targetQty`.
+
+### Account & Bill Book
+- `GET /accounts` | `GET /accounts/:id/summary`
+  - Auth: Required. Returns ledger balances and transaction histories.
+- `GET /audit-logs`
+  - Auth: Required. Role: Admin. Tracks user actions.
 
 ## 4. Inventory Engine (Transactions)
 
@@ -89,6 +105,65 @@ For all transaction endpoints (Purchase Order, Purchase, Purchase Return, Sales,
 - `/stock-adjustments`
 - `/quotations`
   - Includes endpoint `POST /quotations/:id/convert-to-sales` to promote a quote to a sale.
+
+### POS / Billing
+- `POST /pos/cart`
+  - Auth: Required. Role: Admin/Staff.
+  - Body: `{ "productId": 101, "qty": 1 }`
+  - Validates stock, applies multi-tier pricing based on settings. Returns 409 if insufficient stock.
+- `GET /pos/quick-items`
+  - Auth: Required. Returns frequently used items for fast billing.
+- `POST /pos/checkout`
+  - Auth: Required. Role: Admin/Staff.
+  - Body: `{ "items": [...], "paymentModes": [{ "mode": "Cash", "amount": 1000 }, { "mode": "Bank", "amount": 500 }] }`
+  - Success (200): Creates Invoice and instantly updates Inventory and Accounts.
+
+#### POS Edge Cases & Payloads
+
+**1. Split Payment Checkout**
+When a user pays via multiple modes (e.g., Cash and Card).
+```json
+{
+  "customerId": 45,
+  "items": [
+    { "productId": 102, "qty": 2, "price": 1500, "discount1": 100 }
+  ],
+  "paymentModes": [
+    { "mode": "Cash", "amount": 1000 },
+    { "mode": "Bank", "amount": 1900 }
+  ],
+  "totalAmount": 2900
+}
+```
+
+**2. Applying Loyalty Points**
+Redeeming customer loyalty points during checkout.
+```json
+{
+  "customerId": 45,
+  "items": [
+    { "productId": 102, "qty": 1, "price": 1500 }
+  ],
+  "loyaltyPointsUsed": 500,
+  "loyaltyDiscountValue": 50,
+  "paymentModes": [
+    { "mode": "Cash", "amount": 1450 }
+  ]
+}
+```
+
+**3. POS Sales Return (Partial Return)**
+Returning specific items from an existing invoice.
+- `POST /pos/returns`
+```json
+{
+  "originalInvoiceId": 992,
+  "returnItems": [
+    { "productId": 102, "qty": 1, "refundAmount": 1500 }
+  ],
+  "refundMode": "Bank"
+}
+```
 
 ## 5. Dispatch Engine
 - `GET /loading-sheets` | `POST /loading-sheets` | `PUT /loading-sheets/:id` | `DELETE /loading-sheets/:id`

@@ -92,8 +92,19 @@ exports.mergeExpenses = async (req, res) => {
         where: { id: parseInt(targetExpenseId, 10), companyId }
       });
 
-      // Here you would transfer transaction records from source to target when transactions are implemented.
-      // Currently, we'll just delete the source.
+      // Transfer transaction records from source to target
+      await tx.expenseTransaction.updateMany({
+        where: { expenseId: source.id },
+        data: { expenseId: target.id }
+      });
+
+      // Update target balance
+      await tx.expense.update({
+        where: { id: target.id },
+        data: { balance: { increment: source.balance } }
+      });
+
+      // Delete the source.
       await tx.expense.delete({
         where: { id: source.id }
       });
@@ -102,6 +113,98 @@ exports.mergeExpenses = async (req, res) => {
     res.status(200).json({ success: true, message: 'Expenses merged successfully' });
   } catch (error) {
     console.error('Error merging expenses:', error);
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
+  }
+};
+
+// Get expense transactions
+exports.getExpenseTransactions = async (req, res) => {
+  const companyId = req.user.companyId;
+  const expenseId = parseInt(req.params.id, 10);
+
+  try {
+    const expense = await prisma.expense.findUnique({
+      where: { id: expenseId, companyId }
+    });
+
+    if (!expense) {
+      return res.status(404).json({ success: false, message: 'Expense not found' });
+    }
+
+    const transactions = await prisma.expenseTransaction.findMany({
+      where: { expenseId, companyId },
+      orderBy: { date: 'asc' }
+    });
+
+    let entries = [];
+    let runningBalance = 0;
+
+    transactions.forEach(t => {
+      // Expense Amount increases the balance (owed by company / logged expense)
+      // Paid Amount decreases the balance
+      runningBalance += t.expenseAmount;
+      runningBalance -= t.paidAmount;
+      runningBalance -= t.discount;
+
+      entries.push({
+        id: t.id,
+        date: t.date,
+        expenseAmount: t.expenseAmount,
+        paidAmount: t.paidAmount,
+        discount: t.discount,
+        remark: t.remark,
+        balance: runningBalance
+      });
+    });
+
+    res.status(200).json({
+      success: true,
+      expense: expense,
+      data: entries
+    });
+  } catch (error) {
+    console.error('Error fetching expense transactions:', error);
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
+  }
+};
+
+// Add expense transaction
+exports.addExpenseTransaction = async (req, res) => {
+  const companyId = req.user.companyId;
+  const expenseId = parseInt(req.params.id, 10);
+  const { date, expenseAmount, paidAmount, discount, remark } = req.body;
+
+  try {
+    const parsedExpense = parseFloat(expenseAmount) || 0;
+    const parsedPaid = parseFloat(paidAmount) || 0;
+    const parsedDiscount = parseFloat(discount) || 0;
+
+    const result = await prisma.$transaction(async (tx) => {
+      const transaction = await tx.expenseTransaction.create({
+        data: {
+          date: date ? new Date(date) : new Date(),
+          expenseAmount: parsedExpense,
+          paidAmount: parsedPaid,
+          discount: parsedDiscount,
+          remark,
+          expenseId,
+          companyId
+        }
+      });
+
+      // Update expense balance
+      const balanceChange = parsedExpense - (parsedPaid + parsedDiscount);
+      await tx.expense.update({
+        where: { id: expenseId },
+        data: { balance: { increment: balanceChange } }
+      });
+
+      return transaction;
+    });
+
+    res.status(201).json({ success: true, data: result });
+  } catch (error) {
+    console.error('Error adding expense transaction:', error);
     res.status(500).json({ success: false, message: 'Server error', error: error.message });
   }
 };

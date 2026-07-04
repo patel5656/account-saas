@@ -182,6 +182,9 @@ exports.deleteProduct = async (req, res) => {
     res.status(200).json({ success: true, message: 'Product deleted' });
   } catch (error) {
     console.error(error);
+    if (error.code === 'P2003') {
+      return res.status(400).json({ success: false, message: 'Cannot delete product because it has been billed in invoices. Please mark it as Inactive instead.' });
+    }
     res.status(500).json({ success: false, message: 'Server error' });
   }
 };
@@ -239,5 +242,132 @@ exports.mergeProducts = async (req, res) => {
   } catch (error) {
     console.error('Merge Products Error:', error);
     res.status(500).json({ success: false, message: 'Server error during merge' });
+  }
+};
+
+// Get Expiry Report
+exports.getExpiryReport = async (req, res) => {
+  const companyId = req.user.companyId;
+  const { filter, startDate, endDate } = req.query;
+
+  try {
+    const products = await prisma.product.findMany({
+      where: { 
+        companyId,
+        enableExpiry: true,
+        expiryMonth: { not: null, not: "" }
+      },
+      select: {
+        id: true,
+        name: true,
+        sku: true,
+        category: true,
+        stock: true,
+        expiryMonth: true
+      }
+    });
+
+    // Parse dates and filter in-memory
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const filteredProducts = products.filter(p => {
+      // expiryMonth format: DD/MM/YYYY
+      const parts = p.expiryMonth.split('/');
+      if (parts.length !== 3) return false;
+      const expDate = new Date(parts[2], parts[1] - 1, parts[0]);
+      expDate.setHours(0, 0, 0, 0);
+
+      const diffTime = expDate - today;
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+      switch(filter) {
+        case 'Expired Already':
+          return diffDays < 0;
+        case 'Next 7 Days':
+          return diffDays >= 0 && diffDays <= 7;
+        case 'Next 15 Days':
+          return diffDays >= 0 && diffDays <= 15;
+        case 'Next 30 Days':
+          return diffDays >= 0 && diffDays <= 30;
+        case 'Next 3 Months':
+          return diffDays >= 0 && diffDays <= 90;
+        case 'Next 6 Months':
+          return diffDays >= 0 && diffDays <= 180;
+        case 'Custom Date Range':
+          if (startDate && endDate) {
+            const start = new Date(startDate);
+            start.setHours(0,0,0,0);
+            const end = new Date(endDate);
+            end.setHours(23,59,59,999);
+            return expDate >= start && expDate <= end;
+          }
+          return true;
+        default:
+          return true;
+      }
+    });
+
+    // Sort by expiry date ascending
+    filteredProducts.sort((a, b) => {
+      const partsA = a.expiryMonth.split('/');
+      const partsB = b.expiryMonth.split('/');
+      const dateA = new Date(partsA[2], partsA[1] - 1, partsA[0]);
+      const dateB = new Date(partsB[2], partsB[1] - 1, partsB[0]);
+      return dateA - dateB;
+    });
+
+    res.status(200).json({ success: true, data: filteredProducts });
+  } catch (error) {
+    console.error("Expiry Report Error:", error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+// Get Order List
+exports.getOrderList = async (req, res) => {
+  const companyId = req.user.companyId;
+
+  try {
+    const products = await prisma.product.findMany({
+      where: {
+        companyId,
+        lowStockAlert: {
+          gt: 0
+        }
+      },
+      select: {
+        id: true,
+        name: true,
+        category: true,
+        stock: true,
+        lowStockAlert: true,
+        reorderLevel: true,
+        purchasePrice: true
+      }
+    });
+
+    const orderList = products
+      .filter(p => p.stock <= p.lowStockAlert)
+      .map(p => {
+        let quantity = Math.max(p.reorderLevel - p.stock, 1);
+        if (p.reorderLevel <= 0) {
+          quantity = p.lowStockAlert > 0 ? p.lowStockAlert : 1;
+        }
+        
+        return {
+          id: p.id,
+          description: p.name,
+          category: p.category || 'Uncategorized',
+          quantity: quantity,
+          price: p.purchasePrice || 0,
+          amount: quantity * (p.purchasePrice || 0)
+        };
+      });
+
+    res.status(200).json({ success: true, data: orderList });
+  } catch (error) {
+    console.error("Order List Error:", error);
+    res.status(500).json({ success: false, message: 'Server error' });
   }
 };
