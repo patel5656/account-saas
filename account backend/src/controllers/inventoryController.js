@@ -20,7 +20,7 @@ exports.createTransaction = async (req, res) => {
   const { 
     invoiceNo, date, subTotal, totalDiscount, freightCharges, 
     totalAmount, paymentMode, remark, status, customerId, 
-    warehouseId, toWarehouseId, items 
+    warehouseId, toWarehouseId, tcsAmount, items 
   } = req.body;
   const companyId = req.user.companyId;
 
@@ -45,6 +45,7 @@ exports.createTransaction = async (req, res) => {
           totalDiscount,
           freightCharges,
           totalAmount,
+          tcsAmount: tcsAmount ? parseFloat(tcsAmount) : 0,
           paymentMode,
           remark,
           status,

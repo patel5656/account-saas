@@ -324,6 +324,177 @@ exports.getExpiryReport = async (req, res) => {
   }
 };
 
+// Get Stock Inventory Report
+exports.getStockInventory = async (req, res) => {
+  const companyId = req.user.companyId;
+  const { startDate, endDate, search } = req.query;
+
+  try {
+    // Build date filter for invoices
+    let dateFilter = {};
+    if (startDate && endDate) {
+      const start = new Date(startDate);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+      dateFilter = { date: { gte: start, lte: end } };
+    }
+
+    // Search filter for products
+    let productWhere = { companyId };
+    if (search && search.trim() !== '') {
+      productWhere.name = { contains: search.trim() };
+    }
+
+    // Get all products for this company
+    const products = await prisma.product.findMany({
+      where: productWhere,
+      select: {
+        id: true,
+        name: true,
+        stock: true,
+        openingStockRate: true,
+      },
+      orderBy: { name: 'asc' }
+    });
+
+    if (products.length === 0) {
+      return res.status(200).json({ success: true, data: [] });
+    }
+
+    const productIds = products.map(p => p.id);
+
+    // Get purchase quantities from PURCHASE invoices within date range
+    const purchaseItems = await prisma.invoiceItem.findMany({
+      where: {
+        productId: { in: productIds },
+        invoice: {
+          is: {
+            companyId,
+            type: 'PURCHASE',
+            ...dateFilter
+          }
+        }
+      },
+      select: {
+        productId: true,
+        quantity: true,
+        freeQty: true,
+      }
+    });
+
+    // Get sale quantities from SALES invoices within date range
+    const saleItems = await prisma.invoiceItem.findMany({
+      where: {
+        productId: { in: productIds },
+        invoice: {
+          is: {
+            companyId,
+            type: 'SALES',
+            ...dateFilter
+          }
+        }
+      },
+      select: {
+        productId: true,
+        quantity: true,
+        freeQty: true,
+      }
+    });
+
+    // Get sale return quantities (these add back to stock)
+    const saleReturnItems = await prisma.invoiceItem.findMany({
+      where: {
+        productId: { in: productIds },
+        invoice: {
+          is: {
+            companyId,
+            type: 'SALES_RETURN',
+            ...dateFilter
+          }
+        }
+      },
+      select: {
+        productId: true,
+        quantity: true,
+      }
+    });
+
+    // Get purchase return quantities (these reduce purchase qty)
+    const purchaseReturnItems = await prisma.invoiceItem.findMany({
+      where: {
+        productId: { in: productIds },
+        invoice: {
+          is: {
+            companyId,
+            type: 'PURCHASE_RETURN',
+            ...dateFilter
+          }
+        }
+      },
+      select: {
+        productId: true,
+        quantity: true,
+      }
+    });
+
+
+    // Build maps for quick lookup
+    const purchaseMap = {};
+    purchaseItems.forEach(item => {
+      purchaseMap[item.productId] = (purchaseMap[item.productId] || 0) + (item.quantity || 0) + (item.freeQty || 0);
+    });
+
+    const saleMap = {};
+    saleItems.forEach(item => {
+      saleMap[item.productId] = (saleMap[item.productId] || 0) + (item.quantity || 0);
+    });
+
+    const saleReturnMap = {};
+    saleReturnItems.forEach(item => {
+      saleReturnMap[item.productId] = (saleReturnMap[item.productId] || 0) + (item.quantity || 0);
+    });
+
+    const purchaseReturnMap = {};
+    purchaseReturnItems.forEach(item => {
+      purchaseReturnMap[item.productId] = (purchaseReturnMap[item.productId] || 0) + (item.quantity || 0);
+    });
+
+    // If date filter is applied, calculate opening stock dynamically
+    // Opening Stock = Current Stock - (Net Purchases in period) + (Net Sales in period)
+    // Closing Stock = Opening Stock + Net Purchases - Net Sales
+    // If no date filter, opening stock = 0 (showing all time), closing stock = product.stock
+
+    const inventoryData = products.map(product => {
+      const purchaseQty = (purchaseMap[product.id] || 0) - (purchaseReturnMap[product.id] || 0);
+      const saleQty = (saleMap[product.id] || 0) - (saleReturnMap[product.id] || 0);
+
+      let openingStock = 0;
+      let closingStock = product.stock;
+
+      if (startDate && endDate) {
+        // Opening Stock = Closing Stock - Purchases + Sales (reverse calculation)
+        openingStock = product.stock - purchaseQty + saleQty;
+        closingStock = openingStock + purchaseQty - saleQty;
+      }
+
+      return {
+        id: product.id,
+        name: product.name,
+        openingStock,
+        purchaseQty,
+        saleQty,
+        closingStock,
+      };
+    });
+
+    res.status(200).json({ success: true, data: inventoryData });
+  } catch (error) {
+    console.error('Stock Inventory Error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
 // Get Order List
 exports.getOrderList = async (req, res) => {
   const companyId = req.user.companyId;
