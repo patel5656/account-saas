@@ -31,11 +31,29 @@ exports.createProduct = async (req, res) => {
     commissionType, size, colour, expiryMonth, location, hindiName, description, termsCondition, productTags,
     attributeValues
   } = req.body;
+  
+  let finalSku = (sku && sku.trim() !== '') ? sku.trim() : 'SKU-' + Date.now() + '-' + Math.floor(1000 + Math.random() * 9000);
+  
+  // Resolve duplicate SKU if it already exists for the company
+  let skuExists = true;
+  let attempts = 0;
+  while (skuExists && attempts < 10) {
+    const existing = await prisma.product.findFirst({
+      where: { sku: finalSku, companyId }
+    });
+    if (existing) {
+      finalSku = `${sku || 'SKU'}-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
+      attempts++;
+    } else {
+      skuExists = false;
+    }
+  }
+
   try {
     const product = await prisma.product.create({
       data: { 
         name, 
-        sku, 
+        sku: finalSku, 
         barcode,
         price: parseFloat(price) || 0, 
         mrp: parseFloat(mrp) || 0,
