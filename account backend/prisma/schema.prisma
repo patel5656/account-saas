@@ -134,6 +134,7 @@ model Product {
   company      Company       @relation(fields: [companyId], references: [id])
   invoiceItems InvoiceItem[]
   bomItems     BomItem[]
+  attributeValues ProductAttributeValue[]
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
 
@@ -318,6 +319,8 @@ model Category {
   isActive         Boolean  @default(true)
   companyId        Int
   company          Company  @relation(fields: [companyId], references: [id])
+  attributes       CategoryAttribute[]
+  units            CategoryUnit[]
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 }
@@ -528,6 +531,7 @@ model Unit {
   compareTo   String?
   companyId   Int
   company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  categoryUnits CategoryUnit[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
@@ -746,4 +750,40 @@ model CashBook {
   company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+model CategoryAttribute {
+  id         Int      @id @default(autoincrement())
+  name       String
+  type       String
+  options    Json?
+  isRequired Boolean  @default(false)
+  order      Int      @default(0)
+  categoryId Int
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  
+  productValues ProductAttributeValue[]
+}
+
+model CategoryUnit {
+  id         Int      @id @default(autoincrement())
+  categoryId Int
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  unitId     Int
+  unit       Unit     @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  
+  @@unique([categoryId, unitId])
+}
+
+model ProductAttributeValue {
+  id          Int      @id @default(autoincrement())
+  productId   Int
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  attributeId Int
+  attribute   CategoryAttribute @relation(fields: [attributeId], references: [id], onDelete: Cascade)
+  value       Json
+  
+  @@unique([productId, attributeId])
 }

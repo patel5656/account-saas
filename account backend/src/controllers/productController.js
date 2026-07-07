@@ -28,7 +28,8 @@ exports.createProduct = async (req, res) => {
     lowStockAlert, reorderLevel, enableBatch, enableExpiry, enableImei, hasBom, qtySlabs,
     openingStockRate, warehouse, bomName, isMultiLevel, bomRecipe,
     syncOnline, onlineProductName, onlineProductDesc, onlineSalePrice, ecommerceCategory, productImage,
-    commissionType, size, colour, expiryMonth, location, hindiName, description, termsCondition, productTags
+    commissionType, size, colour, expiryMonth, location, hindiName, description, termsCondition, productTags,
+    attributeValues
   } = req.body;
   try {
     const product = await prisma.product.create({
@@ -78,7 +79,15 @@ exports.createProduct = async (req, res) => {
         description,
         termsCondition,
         productTags,
-        companyId 
+        companyId,
+        ...(attributeValues && {
+          attributeValues: {
+            create: attributeValues.map(attr => ({
+              attributeId: parseInt(attr.attributeId, 10),
+              value: attr.value
+            }))
+          }
+        })
       }
     });
     res.status(201).json({ success: true, data: product });
@@ -101,7 +110,8 @@ exports.updateProduct = async (req, res) => {
     lowStockAlert, reorderLevel, enableBatch, enableExpiry, enableImei, hasBom, qtySlabs,
     openingStockRate, warehouse, bomName, isMultiLevel, bomRecipe,
     syncOnline, onlineProductName, onlineProductDesc, onlineSalePrice, ecommerceCategory, productImage,
-    commissionType, size, colour, expiryMonth, location, hindiName, description, termsCondition, productTags
+    commissionType, size, colour, expiryMonth, location, hindiName, description, termsCondition, productTags,
+    attributeValues
   } = req.body;
   try {
     const existing = await prisma.product.findUnique({ where: { id: parseInt(id, 10) } });
@@ -159,6 +169,21 @@ exports.updateProduct = async (req, res) => {
         ...(productTags !== undefined && { productTags })
       }
     });
+
+    if (attributeValues) {
+      await prisma.productAttributeValue.deleteMany({
+        where: { productId: product.id }
+      });
+      if (attributeValues.length > 0) {
+        await prisma.productAttributeValue.createMany({
+          data: attributeValues.map(attr => ({
+            productId: product.id,
+            attributeId: parseInt(attr.attributeId, 10),
+            value: attr.value
+          }))
+        });
+      }
+    }
     res.status(200).json({ success: true, data: product });
   } catch (error) {
     console.error(error);
