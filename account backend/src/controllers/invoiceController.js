@@ -38,6 +38,26 @@ exports.createInvoice = async (req, res) => {
 
   try {
     const result = await prisma.$transaction(async (tx) => {
+      // Check invoice limit based on subscription plan
+      const companyWithPlan = await tx.company.findUnique({
+        where: { id: companyId },
+        include: { plan: true }
+      });
+      
+      if (companyWithPlan && companyWithPlan.plan && companyWithPlan.plan.features) {
+        let features = companyWithPlan.plan.features;
+        if (typeof features === 'string') {
+          try { features = JSON.parse(features); } catch(e){}
+        }
+        const invoiceLimit = features.invoiceLimit || features.invoices;
+        if (invoiceLimit && String(invoiceLimit).toLowerCase() !== 'unlimited') {
+          const currentInvoiceCount = await tx.invoice.count({ where: { companyId } });
+          if (currentInvoiceCount >= parseInt(invoiceLimit, 10)) {
+            throw new Error(`Invoice limit reached for your current plan (${invoiceLimit} invoices). Please upgrade your plan.`);
+          }
+        }
+      }
+
       const customer = await tx.customer.findUnique({
         where: { id: parseInt(customerId, 10) },
         select: { id: true, companyId: true }

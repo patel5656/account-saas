@@ -15,6 +15,12 @@ model Company {
   status     CompanyStatus @default(ACTIVE)
   planId     Int?
   plan       SubscriptionPlan? @relation(fields: [planId], references: [id])
+  phone      String?
+  address    String?
+  startDate  DateTime?
+  expireDate DateTime?
+  planType   String?
+  logo       String? @db.LongText
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
@@ -37,6 +43,7 @@ model Company {
   partySetting PartySetting?
   warehouses Warehouse[]
   branches   Branch[]
+  locations  Location[]
   offers     Offer[]
   companySetting CompanySetting?
   units      Unit[]
@@ -48,6 +55,8 @@ model Company {
   bankTransactions BankTransaction[]
   paymentBookTransactions PaymentBookTransaction[]
   cashBooks    CashBook[]
+
+ @@map("company")
 }
 
 enum CompanyStatus {
@@ -63,6 +72,8 @@ model SubscriptionPlan {
   price     Float
   features  Json
   companies Company[]
+
+ @@map("subscriptionplan")
 }
 
 model User {
@@ -75,6 +86,7 @@ model User {
   company   Company? @relation(fields: [companyId], references: [id])
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+ @@map("user")
 }
 
 enum UserRole {
@@ -139,6 +151,8 @@ model Product {
   updatedAt    DateTime      @updatedAt
 
   @@unique([sku, companyId])
+
+@@map("product")
 }
 
 model Customer {
@@ -174,6 +188,8 @@ model Customer {
   followups Followup[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+@@map("customer")
 }
 
 model Followup {
@@ -184,6 +200,8 @@ model Followup {
   customer     Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+
+@@map("followup")
 }
 
 enum TransactionType {
@@ -225,6 +243,8 @@ model Invoice {
   loadingSheetItems LoadingSheetItem[]
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
+
+@@map("invoice")
 }
 
 model InvoiceItem {
@@ -245,6 +265,8 @@ model InvoiceItem {
   cgst      Float    @default(0)
   sgst      Float    @default(0)
   igst      Float    @default(0)
+
+@@map("invoiceitem")
 }
 
 model AuditLog {
@@ -256,6 +278,8 @@ model AuditLog {
   companyId   Int
   company     Company  @relation(fields: [companyId], references: [id])
   createdAt   DateTime @default(now())
+
+@@map("auditlog")
 }
 
 model Bank {
@@ -273,6 +297,8 @@ model Bank {
   transfersTo   BankTransaction[] @relation("BankTransfersTo")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+@@map("bank")
 }
 
 model Employee {
@@ -295,6 +321,8 @@ model Employee {
   attendances                Attendance[]
   createdAt                  DateTime @default(now())
   updatedAt                  DateTime @updatedAt
+
+@@map("employee")
 }
 
 model Attendance {
@@ -309,6 +337,8 @@ model Attendance {
   updatedAt   DateTime @updatedAt
 
   @@unique([employeeId, date])
+
+@@map("attendance")
 }
 
 model Category {
@@ -323,6 +353,8 @@ model Category {
   units            CategoryUnit[]
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
+
+@@map("category")
 }
 
 model Expense {
@@ -337,6 +369,8 @@ model Expense {
   transactions ExpenseTransaction[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+@@map("expense")
 }
 
 model ExpenseTransaction {
@@ -352,6 +386,8 @@ model ExpenseTransaction {
   company       Company  @relation(fields: [companyId], references: [id])
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+
+@@map("expensetransaction")
 }
 
 model Income {
@@ -363,6 +399,8 @@ model Income {
   company   Company  @relation(fields: [companyId], references: [id])
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+@@map("income")
 }
 
 model PaymentBook {
@@ -376,6 +414,8 @@ model PaymentBook {
   transactions PaymentBookTransaction[]
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+
+@@map("paymentbook")
 }
 
 model Voucher {
@@ -387,6 +427,8 @@ model Voucher {
   company   Company  @relation(fields: [companyId], references: [id])
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+@@map("voucher")
 }
 
 model Bom {
@@ -398,6 +440,8 @@ model Bom {
   items     BomItem[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+@@map("bom")
 }
 
 model BomItem {
@@ -411,6 +455,8 @@ model BomItem {
   salePrice Float    @default(0)
   mrp       Float    @default(0)
   wholesale Float    @default(0)
+
+@@map("bomitem")
 }
 
 model PartyTag {
@@ -421,6 +467,8 @@ model PartyTag {
   company   Company  @relation(fields: [companyId], references: [id])
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+@@map("partytag")
 }
 
 model ProductTag {
@@ -431,6 +479,8 @@ model ProductTag {
   company   Company  @relation(fields: [companyId], references: [id])
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+@@map("producttag")
 }
 
 model CommissionType {
@@ -441,6 +491,7 @@ model CommissionType {
   company   Company  @relation(fields: [companyId], references: [id])
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+@@map("commissiontype")
 }
 
 model PartySetting {
@@ -453,6 +504,8 @@ model PartySetting {
   company         Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+
+@@map("partysetting")
 }
 
 model EmployeeTransaction {
@@ -469,31 +522,59 @@ model EmployeeTransaction {
   company     Company  @relation(fields: [companyId], references: [id])
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+@@map("employeetransaction")
 }
 
 model Warehouse {
-  id        Int      @id @default(autoincrement())
-  name      String
-  location  String?
-  isActive  Boolean  @default(true)
-  companyId Int
-  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id         Int       @id @default(autoincrement())
+  name       String
+  location   String?
+  isActive   Boolean   @default(true)
+  branchId   Int?
+  branch     Branch?   @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  locationId Int?
+  locRef     Location? @relation("WarehouseLocation", fields: [locationId], references: [id], onDelete: SetNull)
+  companyId  Int
+  company    Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+@@map("warehouse")
 }
 
 model Branch {
-  id        Int      @id @default(autoincrement())
-  name      String
-  code      String?
-  contact   String?
-  gstin     String?
-  address   String?
-  isActive  Boolean  @default(true)
-  companyId Int
-  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id         Int         @id @default(autoincrement())
+  name       String
+  code       String?
+  contact    String?
+  gstin      String?
+  address    String?
+  isActive   Boolean     @default(true)
+  companyId  Int
+  company    Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+  locations  Location[]
+  warehouses Warehouse[]
+
+@@map("branch")
+}
+
+model Location {
+  id         Int         @id @default(autoincrement())
+  name       String
+  code       String?
+  address    String?
+  isActive   Boolean     @default(true)
+  branchId   Int
+  branch     Branch      @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  companyId  Int
+  company    Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+  warehouses Warehouse[] @relation("WarehouseLocation")
+
+@@map("location")
 }
 
 model Offer {
@@ -521,6 +602,8 @@ model Offer {
   company         Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+
+@@map("offer")
 }
 
 model Unit {
@@ -534,6 +617,8 @@ model Unit {
   categoryUnits CategoryUnit[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+@@map("unit")
 }
 
 model UnitConversion {
@@ -547,6 +632,8 @@ model UnitConversion {
   company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+@@map("unitconversion")
 }
 
 model CompanySetting {
@@ -673,6 +760,8 @@ model CompanySetting {
   company             Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
+
+@@map("companysetting")
 }
 
 model LoadingSheet {
@@ -685,6 +774,8 @@ model LoadingSheet {
   items       LoadingSheetItem[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+@@map("loadingsheet")
 }
 
 model LoadingSheetItem {
@@ -693,6 +784,8 @@ model LoadingSheetItem {
   loadingSheet    LoadingSheet @relation(fields: [loadingSheetId], references: [id], onDelete: Cascade)
   invoiceId       Int
   invoice         Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+@@map("loadingsheetitem")
 }
 
 model Currency {
@@ -703,6 +796,8 @@ model Currency {
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+@@map("currency")
 }
 
 model BankTransaction {
@@ -719,6 +814,8 @@ model BankTransaction {
   toBank       Bank?    @relation("BankTransfersTo", fields: [toBankId], references: [id], onDelete: Cascade)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+
+@@map("banktransaction")
 }
 
 model PaymentBookTransaction {
@@ -734,6 +831,8 @@ model PaymentBookTransaction {
   company        Company      @relation(fields: [companyId], references: [id])
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
+
+@@map("paymentbooktransaction")
 }
 
 model CashBook {
@@ -750,6 +849,8 @@ model CashBook {
   company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+@@map("cashbook")
 }
 
 model CategoryAttribute {
@@ -765,6 +866,8 @@ model CategoryAttribute {
   updatedAt  DateTime @updatedAt
   
   productValues ProductAttributeValue[]
+
+@@map("categoryattribute")
 }
 
 model CategoryUnit {
@@ -775,6 +878,8 @@ model CategoryUnit {
   unit       Unit     @relation(fields: [unitId], references: [id], onDelete: Cascade)
   
   @@unique([categoryId, unitId])
+
+@@map("categoryunit")
 }
 
 model ProductAttributeValue {
@@ -786,4 +891,6 @@ model ProductAttributeValue {
   value       Json
   
   @@unique([productId, attributeId])
+
+@@map("productattributevalue")
 }

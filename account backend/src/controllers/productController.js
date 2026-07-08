@@ -370,9 +370,42 @@ exports.getExpiryReport = async (req, res) => {
 // Get Stock Inventory Report
 exports.getStockInventory = async (req, res) => {
   const companyId = req.user.companyId;
-  const { startDate, endDate, search } = req.query;
+  const { startDate, endDate, search, branchId, locationId, warehouseId } = req.query;
 
   try {
+    // Fetch all warehouses for company to resolve relationships and apply filtering
+    const warehouses = await prisma.warehouse.findMany({
+      where: { companyId },
+      include: {
+        branch: true,
+        locRef: true
+      }
+    });
+
+    // Determine target warehouse names and IDs for filtering
+    let targetWarehouseNames = null;
+    let targetWarehouseIds = null;
+
+    if (warehouseId) {
+      const wh = warehouses.find(w => w.id === parseInt(warehouseId, 10));
+      if (wh) {
+        targetWarehouseNames = [wh.name];
+        targetWarehouseIds = [wh.id];
+      } else {
+        // If warehouse filter is specified but not found
+        targetWarehouseNames = [];
+        targetWarehouseIds = [];
+      }
+    } else if (locationId) {
+      const whs = warehouses.filter(w => w.locationId === parseInt(locationId, 10));
+      targetWarehouseNames = whs.map(w => w.name);
+      targetWarehouseIds = whs.map(w => w.id);
+    } else if (branchId) {
+      const whs = warehouses.filter(w => w.branchId === parseInt(branchId, 10));
+      targetWarehouseNames = whs.map(w => w.name);
+      targetWarehouseIds = whs.map(w => w.id);
+    }
+
     // Build date filter for invoices
     let dateFilter = {};
     if (startDate && endDate) {
@@ -388,6 +421,11 @@ exports.getStockInventory = async (req, res) => {
     if (search && search.trim() !== '') {
       productWhere.name = { contains: search.trim() };
     }
+    
+    // Filter products by warehouses if a filter is active
+    if (targetWarehouseNames !== null) {
+      productWhere.warehouse = { in: targetWarehouseNames };
+    }
 
     // Get all products for this company
     const products = await prisma.product.findMany({
@@ -397,6 +435,8 @@ exports.getStockInventory = async (req, res) => {
         name: true,
         stock: true,
         openingStockRate: true,
+        warehouse: true,
+        location: true,
       },
       orderBy: { name: 'asc' }
     });
@@ -415,6 +455,7 @@ exports.getStockInventory = async (req, res) => {
           is: {
             companyId,
             type: 'PURCHASE',
+            ...(targetWarehouseIds && { warehouseId: { in: targetWarehouseIds } }),
             ...dateFilter
           }
         }
@@ -434,6 +475,7 @@ exports.getStockInventory = async (req, res) => {
           is: {
             companyId,
             type: 'SALES',
+            ...(targetWarehouseIds && { warehouseId: { in: targetWarehouseIds } }),
             ...dateFilter
           }
         }
@@ -453,6 +495,7 @@ exports.getStockInventory = async (req, res) => {
           is: {
             companyId,
             type: 'SALES_RETURN',
+            ...(targetWarehouseIds && { warehouseId: { in: targetWarehouseIds } }),
             ...dateFilter
           }
         }
@@ -471,6 +514,7 @@ exports.getStockInventory = async (req, res) => {
           is: {
             companyId,
             type: 'PURCHASE_RETURN',
+            ...(targetWarehouseIds && { warehouseId: { in: targetWarehouseIds } }),
             ...dateFilter
           }
         }
@@ -480,7 +524,6 @@ exports.getStockInventory = async (req, res) => {
         quantity: true,
       }
     });
-
 
     // Build maps for quick lookup
     const purchaseMap = {};
@@ -503,11 +546,6 @@ exports.getStockInventory = async (req, res) => {
       purchaseReturnMap[item.productId] = (purchaseReturnMap[item.productId] || 0) + (item.quantity || 0);
     });
 
-    // If date filter is applied, calculate opening stock dynamically
-    // Opening Stock = Current Stock - (Net Purchases in period) + (Net Sales in period)
-    // Closing Stock = Opening Stock + Net Purchases - Net Sales
-    // If no date filter, opening stock = 0 (showing all time), closing stock = product.stock
-
     const inventoryData = products.map(product => {
       const purchaseQty = (purchaseMap[product.id] || 0) - (purchaseReturnMap[product.id] || 0);
       const saleQty = (saleMap[product.id] || 0) - (saleReturnMap[product.id] || 0);
@@ -521,9 +559,18 @@ exports.getStockInventory = async (req, res) => {
         closingStock = openingStock + purchaseQty - saleQty;
       }
 
+      // Resolve branch, location and warehouse names
+      const matchedWarehouse = warehouses.find(w => w.name === product.warehouse);
+      const branchName = matchedWarehouse?.branch?.name || 'No Branch';
+      const locationName = matchedWarehouse?.locRef?.name || product.location || 'No Location';
+      const warehouseName = product.warehouse || 'No Warehouse';
+
       return {
         id: product.id,
         name: product.name,
+        branchName,
+        locationName,
+        warehouseName,
         openingStock,
         purchaseQty,
         saleQty,

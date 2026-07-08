@@ -24,6 +24,26 @@ exports.createEmployee = async (req, res) => {
     commissionOnManufacturing, openingBalance, openingBalanceType 
   } = req.body;
   try {
+    // Check user limit based on subscription plan
+    const companyWithPlan = await prisma.company.findUnique({
+      where: { id: companyId },
+      include: { plan: true }
+    });
+    
+    if (companyWithPlan && companyWithPlan.plan && companyWithPlan.plan.features) {
+      let features = companyWithPlan.plan.features;
+      if (typeof features === 'string') {
+        try { features = JSON.parse(features); } catch(e){}
+      }
+      const userLimit = features.userLimit || features.users;
+      if (userLimit && String(userLimit).toLowerCase() !== 'unlimited') {
+        const currentEmployeeCount = await prisma.employee.count({ where: { companyId } });
+        if (currentEmployeeCount >= parseInt(userLimit, 10)) {
+          return res.status(400).json({ success: false, message: `User limit reached for your current plan (${userLimit} users). Please upgrade your plan.` });
+        }
+      }
+    }
+
     let initialBalance = 0;
     if (openingBalance) {
       initialBalance = parseFloat(openingBalance);
