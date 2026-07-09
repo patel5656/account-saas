@@ -258,6 +258,9 @@ model InvoiceItem {
   price     Float    @default(0)
   discount1 Float    @default(0)
   discount2 Float    @default(0)
+  batchNo   String?
+  mfgDate   String?
+  expDate   String?
   imei      String?
   amount    Float    @default(0)
   gstRate   Float    @default(0)
