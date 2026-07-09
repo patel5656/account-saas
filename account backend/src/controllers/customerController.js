@@ -136,3 +136,47 @@ exports.deleteCustomer = async (req, res) => {
     res.status(500).json({ success: false, message: 'Server error' });
   }
 };
+
+// Get stats for a customer (Joining date, Total Billing, Last Transaction)
+exports.getCustomerStats = async (req, res) => {
+  const companyId = req.user.companyId;
+  const { id } = req.params;
+  
+  try {
+    const customerId = parseInt(id, 10);
+    const customer = await prisma.customer.findUnique({
+      where: { id: customerId, companyId }
+    });
+    
+    if (!customer) {
+      return res.status(404).json({ success: false, message: 'Customer not found' });
+    }
+    
+    const invoices = await prisma.invoice.findMany({
+      where: { 
+        companyId, 
+        customerId: customer.id,
+        status: { not: 'CANCELLED' } 
+      },
+      orderBy: { date: 'desc' },
+      select: { date: true, totalAmount: true, type: true }
+    });
+    
+    // total billing is sum of all transaction amounts.
+    const totalBilling = invoices.reduce((acc, inv) => acc + (inv.totalAmount || 0), 0);
+    const lastTransaction = invoices.length > 0 ? invoices[0].date : null;
+    
+    res.status(200).json({
+      success: true,
+      data: {
+        joiningDate: customer.joiningDate || customer.createdAt,
+        totalBilling,
+        lastTransaction,
+        dueAmount: customer.balance
+      }
+    });
+  } catch(error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};

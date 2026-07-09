@@ -29,6 +29,7 @@ exports.createProduct = async (req, res) => {
     openingStockRate, warehouse, bomName, isMultiLevel, bomRecipe,
     syncOnline, onlineProductName, onlineProductDesc, onlineSalePrice, ecommerceCategory, productImage,
     commissionType, size, colour, expiryMonth, location, hindiName, description, termsCondition, productTags,
+    rawMaterials, extraCharges, subItems, subInventory,
     attributeValues
   } = req.body;
   
@@ -97,6 +98,10 @@ exports.createProduct = async (req, res) => {
         description,
         termsCondition,
         productTags,
+        rawMaterials,
+        extraCharges,
+        subItems,
+        subInventory,
         companyId,
         ...(attributeValues && {
           attributeValues: {
@@ -129,6 +134,7 @@ exports.updateProduct = async (req, res) => {
     openingStockRate, warehouse, bomName, isMultiLevel, bomRecipe,
     syncOnline, onlineProductName, onlineProductDesc, onlineSalePrice, ecommerceCategory, productImage,
     commissionType, size, colour, expiryMonth, location, hindiName, description, termsCondition, productTags,
+    rawMaterials, extraCharges, subItems, subInventory,
     attributeValues
   } = req.body;
   try {
@@ -184,7 +190,11 @@ exports.updateProduct = async (req, res) => {
         ...(hindiName !== undefined && { hindiName }),
         ...(description !== undefined && { description }),
         ...(termsCondition !== undefined && { termsCondition }),
-        ...(productTags !== undefined && { productTags })
+        ...(productTags !== undefined && { productTags }),
+        ...(rawMaterials !== undefined && { rawMaterials }),
+        ...(extraCharges !== undefined && { extraCharges }),
+        ...(subItems !== undefined && { subItems }),
+        ...(subInventory !== undefined && { subInventory })
       }
     });
 

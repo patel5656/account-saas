@@ -142,6 +142,10 @@ model Product {
   description     String?       @db.Text
   termsCondition  String?       @db.Text
   productTags     String?
+  rawMaterials    Json?
+  extraCharges    Json?
+  subItems        Json?
+  subInventory    Json?
   companyId       Int
   company      Company       @relation(fields: [companyId], references: [id])
   invoiceItems InvoiceItem[]
