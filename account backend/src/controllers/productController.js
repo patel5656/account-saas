@@ -5,7 +5,7 @@ const prisma = new PrismaClient();
 exports.getProducts = async (req, res) => {
   const companyId = req.user.companyId;
   const page = parseInt(req.query.page, 10) || 1;
-  const limit = parseInt(req.query.limit, 10) || 10;
+  const limit = parseInt(req.query.limit, 10) || 100000;
   const skip = (page - 1) * limit;
   try {
     const [products, total] = await Promise.all([
