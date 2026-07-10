@@ -11,7 +11,7 @@ model Company {
   id         Int      @id @default(autoincrement())
   name       String
   ownerName  String
-  ownerEmail String   @unique
+  ownerEmail String   @unique(map: "Company_ownerEmail_key")
   status     CompanyStatus @default(ACTIVE)
   planId     Int?
   plan       SubscriptionPlan? @relation(fields: [planId], references: [id])
@@ -55,6 +55,12 @@ model Company {
   bankTransactions BankTransaction[]
   paymentBookTransactions PaymentBookTransaction[]
   cashBooks    CashBook[]
+  complaints     Complaint[]
+  serviceReminders ServiceReminder[]
+  messageTemplates MessageTemplate[]
+  bankStatements BankStatement[]
+  bankStatementRecords BankStatementRecord[]
+  stockAdjustmentLogs StockAdjustmentLog[]
 
  @@map("company")
 }
@@ -79,11 +85,12 @@ model SubscriptionPlan {
 model User {
   id        Int      @id @default(autoincrement())
   name      String
-  email     String   @unique
+  email     String   @unique(map: "User_email_key")
   password  String
   role      UserRole @default(STAFF)
   companyId Int?
   company   Company? @relation(fields: [companyId], references: [id])
+  notificationPermissions Json?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
  @@map("user")
@@ -151,10 +158,12 @@ model Product {
   invoiceItems InvoiceItem[]
   bomItems     BomItem[]
   attributeValues ProductAttributeValue[]
+  stockAdjustmentLogs StockAdjustmentLog[]
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
+  deletedAt    DateTime?
 
-  @@unique([sku, companyId])
+  @@unique([sku, companyId], map: "Product_sku_companyId_key")
 
 @@map("product")
 }
@@ -192,6 +201,7 @@ model Customer {
   followups Followup[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  deletedAt DateTime?
 
 @@map("customer")
 }
@@ -247,6 +257,7 @@ model Invoice {
   loadingSheetItems LoadingSheetItem[]
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
+  deletedAt      DateTime?
 
 @@map("invoice")
 }
@@ -302,6 +313,7 @@ model Bank {
   company   Company  @relation(fields: [companyId], references: [id])
   transfersFrom BankTransaction[] @relation("BankTransfersFrom")
   transfersTo   BankTransaction[] @relation("BankTransfersTo")
+  bankStatements BankStatement[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -343,7 +355,7 @@ model Attendance {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  @@unique([employeeId, date])
+  @@unique([employeeId, date], map: "Attendance_employeeId_date_key")
 
 @@map("attendance")
 }
@@ -507,7 +519,7 @@ model PartySetting {
   showPartyTags   Boolean  @default(true)
   showDueDate     Boolean  @default(true)
   extraColumns    Json?
-  companyId       Int      @unique
+  companyId       Int      @unique(map: "PartySetting_companyId_key")
   company         Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
@@ -762,8 +774,13 @@ model CompanySetting {
   showBankDetails          Boolean   @default(false)
   accountingFormat         Boolean   @default(false)
   billWisePayment          Boolean   @default(false)
+  paymentReminderEnabled   Boolean   @default(false)
+  
+  // Complain Settings
+  showTechnician           Boolean   @default(true)
+  complainExtraColumn      String?   @db.Text
 
-  companyId           Int      @unique
+  companyId           Int      @unique(map: "CompanySetting_companyId_key")
   company             Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
@@ -797,7 +814,7 @@ model LoadingSheetItem {
 
 model Currency {
   id          Int      @id @default(autoincrement())
-  code        String   @unique
+  code        String   @unique(map: "Currency_code_key")
   symbol      String?
   name        String
   isActive    Boolean  @default(true)
@@ -884,7 +901,7 @@ model CategoryUnit {
   unitId     Int
   unit       Unit     @relation(fields: [unitId], references: [id], onDelete: Cascade)
   
-  @@unique([categoryId, unitId])
+  @@unique([categoryId, unitId], map: "CategoryUnit_categoryId_unitId_key")
 
 @@map("categoryunit")
 }
@@ -897,7 +914,104 @@ model ProductAttributeValue {
   attribute   CategoryAttribute @relation(fields: [attributeId], references: [id], onDelete: Cascade)
   value       Json
   
-  @@unique([productId, attributeId])
+  @@unique([productId, attributeId], map: "ProductAttributeValue_productId_attributeId_key")
 
 @@map("productattributevalue")
+}
+
+model Complaint {
+  id              Int      @id @default(autoincrement())
+  complainDate    DateTime @default(now())
+  partyName       String?
+  productName     String?
+  technicianName  String?
+  details         String?  @db.Text
+  serviceAmount   Float    @default(0)
+  remark          String?  @db.Text
+  location        String?
+  status          String   @default("Pending")
+  companyId       Int
+  company         Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  deletedAt       DateTime?
+  @@map("complaint")
+}
+
+model ServiceReminder {
+  id              Int      @id @default(autoincrement())
+  partyName       String
+  productName     String?
+  contactPerson   String?
+  mobileNo        String?
+  serviceDate     DateTime
+  note            String?  @db.Text
+  status          String   @default("Pending")
+  companyId       Int
+  company         Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  deletedAt       DateTime?
+  @@map("servicereminder")
+}
+
+model MessageTemplate {
+  id              Int      @id @default(autoincrement())
+  type            String   // SMS, WhatsApp, Email
+  name            String
+  content         String   @db.Text
+  isActive        Boolean  @default(true)
+  companyId       Int
+  company         Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  deletedAt       DateTime?
+  @@map("messagetemplate")
+}
+
+model BankStatement {
+  id              Int      @id @default(autoincrement())
+  bankId          Int
+  bank            Bank     @relation(fields: [bankId], references: [id], onDelete: Cascade)
+  uploadDate      DateTime @default(now())
+  fileName        String
+  companyId       Int
+  company         Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  records         BankStatementRecord[]
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  deletedAt       DateTime?
+  @@map("bankstatement")
+}
+
+model BankStatementRecord {
+  id              Int      @id @default(autoincrement())
+  statementId     Int
+  statement       BankStatement @relation(fields: [statementId], references: [id], onDelete: Cascade)
+  date            DateTime
+  description     String   @db.Text
+  refNo           String?
+  debit           Float    @default(0)
+  credit          Float    @default(0)
+  balance         Float    @default(0)
+  companyId       Int
+  company         Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  @@map("bankstatementrecord")
+}
+
+model StockAdjustmentLog {
+  id              Int      @id @default(autoincrement())
+  productId       Int
+  product         Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  oldStock        Int
+  newStock        Int
+  reason          String?  @db.Text
+  date            DateTime @default(now())
+  companyId       Int
+  company         Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  @@map("stockadjustmentlog")
 }

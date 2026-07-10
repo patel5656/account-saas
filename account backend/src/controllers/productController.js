@@ -642,3 +642,182 @@ exports.getOrderList = async (req, res) => {
     res.status(500).json({ success: false, message: 'Server error' });
   }
 };
+
+// Bulk update HSN/GST
+exports.bulkUpdateHsnGst = async (req, res) => {
+  try {
+    const companyId = req.user.companyId;
+    const { products } = req.body;
+    
+    if (!products || !Array.isArray(products)) {
+      return res.status(400).json({ success: false, message: 'Invalid products array' });
+    }
+
+    const updatePromises = products.map(p => {
+      // Clean GST string like "@18 %" to "18"
+      const taxRate = p.gst ? parseFloat(p.gst.replace(/[^0-9.]/g, '')) : 0;
+      return prisma.product.updateMany({
+        where: { id: p.id, companyId },
+        data: { hsnCode: p.hsn || null, tax: isNaN(taxRate) ? 0 : taxRate }
+      });
+    });
+
+    await Promise.all(updatePromises);
+    res.json({ success: true, message: 'Products updated successfully' });
+  } catch (error) {
+    console.error('Bulk update error', error);
+    res.status(500).json({ success: false, message: 'Failed to bulk update HSN/GST' });
+  }
+};
+
+// Correct all product stocks based on invoices
+exports.stockCorrection = async (req, res) => {
+  const companyId = req.user.companyId;
+  try {
+    const products = await prisma.product.findMany({ where: { companyId }, select: { id: true, stock: true, openingStockRate: true } });
+    const productIds = products.map(p => p.id);
+
+    const purchaseItems = await prisma.invoiceItem.findMany({
+      where: { productId: { in: productIds }, invoice: { is: { companyId, type: 'PURCHASE' } } },
+      select: { productId: true, quantity: true, freeQty: true }
+    });
+    const saleItems = await prisma.invoiceItem.findMany({
+      where: { productId: { in: productIds }, invoice: { is: { companyId, type: 'SALES' } } },
+      select: { productId: true, quantity: true, freeQty: true }
+    });
+    const saleReturnItems = await prisma.invoiceItem.findMany({
+      where: { productId: { in: productIds }, invoice: { is: { companyId, type: 'SALES_RETURN' } } },
+      select: { productId: true, quantity: true }
+    });
+    const purchaseReturnItems = await prisma.invoiceItem.findMany({
+      where: { productId: { in: productIds }, invoice: { is: { companyId, type: 'PURCHASE_RETURN' } } },
+      select: { productId: true, quantity: true }
+    });
+
+    const pMap = {};
+    purchaseItems.forEach(i => pMap[i.productId] = (pMap[i.productId]||0) + (i.quantity||0) + (i.freeQty||0));
+    
+    const sMap = {};
+    saleItems.forEach(i => sMap[i.productId] = (sMap[i.productId]||0) + (i.quantity||0));
+    
+    const srMap = {};
+    saleReturnItems.forEach(i => srMap[i.productId] = (srMap[i.productId]||0) + (i.quantity||0));
+    
+    const prMap = {};
+    purchaseReturnItems.forEach(i => prMap[i.productId] = (prMap[i.productId]||0) + (i.quantity||0));
+
+    // Run updates in a transaction for safety
+    await prisma.$transaction(async (tx) => {
+      for (const product of products) {
+        const pQty = pMap[product.id] || 0;
+        const sQty = sMap[product.id] || 0;
+        const srQty = srMap[product.id] || 0;
+        const prQty = prMap[product.id] || 0;
+        
+        // Notice we don't have an explicit 'openingStock', but we assume transactions dictate the stock variation.
+        // Wait, if product.stock currently holds openingStock + variations, we can't just set it to variations.
+        // But since we don't have openingStock, we must set it to (Purchases - Sales + SalesReturns - PurchaseReturns)
+        // because we consider `getStockInventory` logic which assumes variations define stock.
+        
+        const newStock = pQty - sQty + srQty - prQty;
+        
+        await tx.product.update({
+          where: { id: product.id },
+          data: { stock: newStock }
+        });
+      }
+    });
+
+    res.status(200).json({ success: true, message: 'Stock corrected successfully for all products.' });
+  } catch (error) {
+    console.error('Stock Correction Error:', error);
+    res.status(500).json({ success: false, message: 'Server error during stock correction' });
+  }
+};
+
+// Bulk update product prices
+exports.bulkUpdatePrices = async (req, res) => {
+  try {
+    const companyId = req.user.companyId;
+    const { products } = req.body;
+    
+    if (!products || !Array.isArray(products)) {
+      return res.status(400).json({ success: false, message: 'Invalid products array' });
+    }
+
+    const updatePromises = products.map(p => {
+      const data = {};
+      if (p.purchasePrice !== undefined) data.purchasePrice = parseFloat(p.purchasePrice) || 0;
+      if (p.mrp !== undefined) data.mrp = parseFloat(p.mrp) || 0;
+      if (p.creditSale !== undefined) data.creditSalePrice = parseFloat(p.creditSale) || 0;
+      if (p.cashSale !== undefined) data.price = parseFloat(p.cashSale) || 0;
+      if (p.wholeSale !== undefined) data.wholesalePrice = parseFloat(p.wholeSale) || 0;
+      if (p.hsn !== undefined) data.hsnCode = p.hsn === '+Add' ? null : p.hsn;
+
+      return prisma.product.updateMany({
+        where: { id: parseInt(p.id, 10), companyId },
+        data
+      });
+    });
+
+    await Promise.all(updatePromises);
+    res.json({ success: true, message: 'Product prices updated successfully' });
+  } catch (error) {
+    console.error('Bulk update prices error', error);
+    res.status(500).json({ success: false, message: 'Failed to bulk update prices' });
+  }
+};
+
+// Get Item Quantity Report for a specific product
+exports.getItemQuantityReport = async (req, res) => {
+  const companyId = req.user.companyId;
+  const productId = parseInt(req.params.id, 10);
+  try {
+    const product = await prisma.product.findFirst({ where: { id: productId, companyId } });
+    if (!product) return res.status(404).json({ success: false, message: 'Product not found' });
+
+    const invoiceItems = await prisma.invoiceItem.findMany({
+      where: { productId, invoice: { companyId } },
+      include: { invoice: { include: { customer: true } } },
+      orderBy: { invoice: { date: 'asc' } }
+    });
+
+    let runningStock = 0;
+    const transactions = invoiceItems.map(item => {
+      const inv = item.invoice;
+      const partyName = inv.customer?.name || 'Cash';
+      const type = inv.type; // PURCHASE, SALES, etc.
+      
+      let qtyIn = 0;
+      let qtyOut = 0;
+      const qty = (item.quantity || 0) + (item.freeQty || 0);
+
+      if (type === 'PURCHASE' || type === 'SALES_RETURN') {
+        qtyIn = qty;
+        runningStock += qty;
+      } else if (type === 'SALES' || type === 'PURCHASE_RETURN') {
+        qtyOut = qty;
+        runningStock -= qty;
+      }
+
+      return {
+        id: item.id,
+        invoiceId: inv.id,
+        date: inv.date,
+        partyName,
+        type,
+        productName: product.name,
+        qtyIn,
+        qtyOut,
+        price: item.price,
+        total: item.amount,
+        runningStock
+      };
+    });
+
+    res.status(200).json({ success: true, product, transactions, openingStock: 0 });
+  } catch (error) {
+    console.error('Error fetching item quantity report:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
