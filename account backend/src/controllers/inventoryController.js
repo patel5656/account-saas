@@ -86,17 +86,18 @@ exports.createTransaction = async (req, res) => {
       await updateStock(items, type.toUpperCase(), warehouseId, toWarehouseId, tx);
 
       // 3. Update financial ledgers (Customer/Party balance)
-      if (type.toUpperCase() === 'SALES' && status !== 'PAID' && customerId) {
+      const parsedCustomerId = customerId ? parseInt(customerId, 10) : null;
+      if (type.toUpperCase() === 'SALES' && status !== 'PAID' && parsedCustomerId && !isNaN(parsedCustomerId)) {
         // Increase customer balance (they owe us)
         await tx.customer.update({
-          where: { id: parseInt(customerId) },
+          where: { id: parsedCustomerId },
           data: { balance: { increment: totalAmount } }
         });
-      } else if (type.toUpperCase() === 'PURCHASE' && status !== 'PAID' && customerId) {
+      } else if (type.toUpperCase() === 'PURCHASE' && status !== 'PAID' && parsedCustomerId && !isNaN(parsedCustomerId)) {
         // Increase supplier balance (we owe them)
         // Note: Assuming customer model acts as party/supplier too
         await tx.customer.update({
-          where: { id: parseInt(customerId) },
+          where: { id: parsedCustomerId },
           data: { balance: { increment: totalAmount } }
         });
       }

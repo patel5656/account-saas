@@ -288,14 +288,20 @@ model InvoiceItem {
 }
 
 model AuditLog {
-  id          Int      @id @default(autoincrement())
-  actionType  String
-  details     String
-  referenceId String?
-  userName    String
-  companyId   Int
-  company     Company  @relation(fields: [companyId], references: [id])
-  createdAt   DateTime @default(now())
+  id           Int      @id @default(autoincrement())
+  actionType   String
+  details      String?  @db.Text
+  referenceId  String?
+  userName     String
+  userRole     String   @default("User")
+  billNumber   String?
+  moduleName   String?
+  previousData Json?
+  updatedData  Json?
+  ipAddress    String?
+  companyId    Int
+  company      Company  @relation(fields: [companyId], references: [id])
+  createdAt    DateTime @default(now())
 
 @@map("auditlog")
 }
