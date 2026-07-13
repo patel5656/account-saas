@@ -785,6 +785,7 @@ model CompanySetting {
   // Complain Settings
   showTechnician           Boolean   @default(true)
   complainExtraColumn      String?   @db.Text
+  printSettings            Json?
 
   companyId           Int      @unique(map: "CompanySetting_companyId_key")
   company             Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)

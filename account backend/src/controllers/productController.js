@@ -9,8 +9,8 @@ exports.getProducts = async (req, res) => {
   const skip = (page - 1) * limit;
   try {
     const [products, total] = await Promise.all([
-      prisma.product.findMany({ where: { companyId }, skip, take: limit }),
-      prisma.product.count({ where: { companyId } })
+      prisma.product.findMany({ where: { companyId, deletedAt: null }, skip, take: limit }),
+      prisma.product.count({ where: { companyId, deletedAt: null } })
     ]);
     res.status(200).json({ success: true, data: products, meta: { total, page, limit } });
   } catch (error) {
@@ -223,21 +223,36 @@ exports.updateProduct = async (req, res) => {
 exports.deleteProduct = async (req, res) => {
   const companyId = req.user.companyId;
   const { id } = req.params;
+  const productId = parseInt(id, 10);
   try {
-    const existing = await prisma.product.findUnique({ where: { id: parseInt(id, 10) } });
+    const existing = await prisma.product.findUnique({ where: { id: productId } });
     if (!existing || existing.companyId !== companyId) {
       return res.status(404).json({ success: false, message: 'Product not found' });
     }
-    
-    await prisma.product.delete({
-      where: { id: parseInt(id, 10) }
-    });
+
+    // Check if this product is used in any invoice
+    const invoiceItemCount = await prisma.invoiceItem.count({ where: { productId } });
+
+    if (invoiceItemCount > 0) {
+      // Soft-delete: mark as Deleted so invoice history is preserved
+      await prisma.product.update({
+        where: { id: productId },
+        data: { status: 'Deleted', deletedAt: new Date() }
+      });
+      return res.status(200).json({ success: true, message: 'Product marked as deleted (used in invoices)' });
+    }
+
+    // Hard-delete: no invoice references, safe to remove completely
+    await prisma.$transaction([
+      prisma.bomItem.deleteMany({ where: { productId } }),
+      prisma.productAttributeValue.deleteMany({ where: { productId } }),
+      prisma.stockAdjustmentLog.deleteMany({ where: { productId } }),
+      prisma.product.delete({ where: { id: productId } })
+    ]);
+
     res.status(200).json({ success: true, message: 'Product deleted' });
   } catch (error) {
     console.error(error);
-    if (error.code === 'P2003') {
-      return res.status(400).json({ success: false, message: 'Cannot delete product because it has been billed in invoices. Please mark it as Inactive instead.' });
-    }
     res.status(500).json({ success: false, message: 'Server error' });
   }
 };
