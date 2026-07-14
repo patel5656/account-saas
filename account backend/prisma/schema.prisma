@@ -676,6 +676,7 @@ model CompanySetting {
   showListPrice       Boolean  @default(false)
   showPurchasePrice   Boolean  @default(false)
   showDiscount        Boolean  @default(false)
+  showDiscount2       Boolean  @default(false)
   hideTotalDiscount   Boolean  @default(false)
   hideFreightCharge   Boolean  @default(false)
   showPriceFirst      Boolean  @default(false)

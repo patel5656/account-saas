@@ -66,18 +66,36 @@ exports.createInvoice = async (req, res) => {
         throw new Error('Invalid customer for this company');
       }
 
+      let earnedPoints = 0;
+      const pointsToRedeem = parseInt(req.body.redeemedPoints, 10) || 0;
+
       for (const item of items) {
         const product = await tx.product.findUnique({
           where: { id: parseInt(item.productId, 10) },
-          select: { id: true, stock: true, companyId: true }
+          select: { id: true, stock: true, companyId: true, creditSalePrice: true }
         });
         if (!product || product.companyId !== companyId) {
           throw new Error(`Product ${item.productId} not found for this company`);
         }
+        
+        if (product.creditSalePrice && product.creditSalePrice > 0) {
+          earnedPoints += Math.floor(product.creditSalePrice * (parseInt(item.quantity) || 0));
+        }
+
         await tx.product.update({
           where: { id: product.id },
           data: { stock: { decrement: parseInt(item.quantity) } }
         });
+      }
+
+      if (customerId) {
+        const netPoints = earnedPoints - pointsToRedeem;
+        if (netPoints !== 0) {
+          await tx.customer.update({
+            where: { id: parseInt(customerId, 10) },
+            data: { loyaltyPoints: { increment: netPoints } }
+          });
+        }
       }
 
       const invoice = await tx.invoice.create({

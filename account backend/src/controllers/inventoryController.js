@@ -102,6 +102,28 @@ exports.createTransaction = async (req, res) => {
         });
       }
 
+      // 4. Update Loyalty Points
+      if (parsedCustomerId && !isNaN(parsedCustomerId) && (type.toUpperCase() === 'SALES' || type.toUpperCase() === 'PURCHASE')) {
+        let earnedPoints = 0;
+        for (const item of items) {
+          const product = await tx.product.findUnique({
+            where: { id: parseInt(item.productId, 10) },
+            select: { creditSalePrice: true }
+          });
+          if (product && product.creditSalePrice > 0) {
+            earnedPoints += Math.floor(product.creditSalePrice * (parseInt(item.quantity) || 0));
+          }
+        }
+        const pointsToRedeem = parseInt(req.body.redeemedPoints, 10) || 0;
+        const netPoints = earnedPoints - pointsToRedeem;
+        if (netPoints !== 0) {
+          await tx.customer.update({
+            where: { id: parsedCustomerId },
+            data: { loyaltyPoints: { increment: netPoints } }
+          });
+        }
+      }
+
       return invoice;
     });
 
