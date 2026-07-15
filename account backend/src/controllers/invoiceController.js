@@ -192,3 +192,41 @@ exports.getInvoices = async (req, res) => {
     res.status(400).json({ success: false, message: error.message || 'Server error' });
   }
 };
+
+/**
+ * Mark an invoice as PAID
+ */
+exports.markInvoicePaid = async (req, res) => {
+  const companyId = req.user.companyId;
+  const { id } = req.params;
+
+  try {
+    const invoiceId = parseInt(id, 10);
+    const invoice = await prisma.invoice.findUnique({
+      where: { id: invoiceId }
+    });
+
+    if (!invoice || invoice.companyId !== companyId) {
+      return res.status(404).json({ success: false, message: 'Invoice not found' });
+    }
+
+    const updatedInvoice = await prisma.invoice.update({
+      where: { id: invoiceId },
+      data: { status: 'PAID' }
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        actionType: 'MARK_INVOICE_PAID',
+        details: JSON.stringify({ invoiceNo: invoice.invoiceNo }),
+        userName: String(req.user.email || req.user.name || req.user.id),
+        companyId,
+      },
+    });
+
+    res.status(200).json({ success: true, message: 'Invoice marked as paid', data: updatedInvoice });
+  } catch (error) {
+    console.error('Error marking invoice as paid:', error);
+    res.status(400).json({ success: false, message: error.message || 'Server error' });
+  }
+};

@@ -9,7 +9,12 @@ exports.getProducts = async (req, res) => {
   const skip = (page - 1) * limit;
   try {
     const [products, total] = await Promise.all([
-      prisma.product.findMany({ where: { companyId, deletedAt: null }, skip, take: limit }),
+      prisma.product.findMany({ 
+        where: { companyId, deletedAt: null }, 
+        include: { attributeValues: true },
+        skip, 
+        take: limit 
+      }),
       prisma.product.count({ where: { companyId, deletedAt: null } })
     ]);
     res.status(200).json({ success: true, data: products, meta: { total, page, limit } });

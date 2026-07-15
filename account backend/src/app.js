@@ -54,6 +54,10 @@ const serviceReminderRoutes = require('./routes/serviceReminderRoutes.js');
 const messageTemplateRoutes = require('./routes/messageTemplateRoutes.js');
 const bankStatementRoutes = require('./routes/bankStatementRoutes.js');
 const recycleBinRoutes = require('./routes/recycleBinRoutes.js');
+const publicRoutes = require('./routes/publicRoutes.js');
+
+// Public routes (no auth required) — register BEFORE authenticated routes
+app.use('/api/v1/public', publicRoutes);
 
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/companies', companyRoutes);

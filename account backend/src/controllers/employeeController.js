@@ -298,6 +298,64 @@ exports.addEmployeeTransaction = async (req, res) => {
   }
 };
 
+// Delete employee transaction
+exports.deleteEmployeeTransaction = async (req, res) => {
+  const companyId = req.user.companyId;
+  const transactionId = parseInt(req.params.transactionId, 10);
+
+  try {
+    const result = await prisma.$transaction(async (tx) => {
+      // Find the transaction
+      const transaction = await tx.employeeTransaction.findUnique({
+        where: { id: transactionId, companyId }
+      });
+
+      if (!transaction) {
+        throw new Error('Transaction not found');
+      }
+
+      // We cannot easily delete OPENING_BALANCE from here without messing up initial setup, but let's allow if needed, 
+      // though typically OPENING_BALANCE is managed via Employee Master.
+      // Reverse the balance impact
+      if (transaction.type === 'SALARY') {
+        await tx.employee.update({
+          where: { id: transaction.employeeId },
+          data: { balance: { decrement: transaction.amount } }
+        });
+      } else if (transaction.type === 'PAYMENT') {
+        await tx.employee.update({
+          where: { id: transaction.employeeId },
+          data: { balance: { increment: transaction.amount + (transaction.discount || 0) } }
+        });
+      } else if (transaction.type === 'OPENING_BALANCE') {
+        if (transaction.remark && transaction.remark.includes('ADVANCE')) {
+           await tx.employee.update({
+             where: { id: transaction.employeeId },
+             data: { balance: { increment: transaction.amount } }
+           });
+        } else {
+           await tx.employee.update({
+             where: { id: transaction.employeeId },
+             data: { balance: { decrement: transaction.amount } }
+           });
+        }
+      }
+
+      // Delete the transaction
+      await tx.employeeTransaction.delete({
+        where: { id: transactionId }
+      });
+
+      return transaction;
+    });
+
+    res.status(200).json({ success: true, message: 'Transaction deleted successfully', data: result });
+  } catch (error) {
+    console.error('Error deleting employee transaction:', error);
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
+  }
+};
+
 // Get employee attendance
 exports.getAttendance = async (req, res) => {
   const companyId = req.user.companyId;
