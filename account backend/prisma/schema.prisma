@@ -36,6 +36,7 @@ model Company {
   expenses   Expense[]
   expenseTransactions ExpenseTransaction[]
   incomes    Income[]
+  incomeTransactions IncomeTransaction[]
   payments   PaymentBook[]
   vouchers   Voucher[]
   boms       Bom[]
@@ -130,6 +131,8 @@ model Product {
   hasBom          Boolean?      @default(false)
   qtySlabs        Json?
   openingStockRate Float?       @default(0)
+  secOpeningQty   Float?        @default(0)
+  asOfDate        String?
   warehouse       String?
   bomName         String?
   isMultiLevel    Boolean?      @default(false)
@@ -270,6 +273,8 @@ model InvoiceItem {
   product   Product  @relation(fields: [productId], references: [id])
   quantity  Int      @default(1)
   freeQty   Int      @default(0)
+  primaryOpeningQty Float?   @default(0)
+  secOpeningQty     Float?   @default(0)
   price     Float    @default(0)
   discount1 Float    @default(0)
   discount2 Float    @default(0)
@@ -420,12 +425,31 @@ model Income {
   name      String
   head      String?
   isActive  Boolean  @default(true)
+  balance   Float    @default(0)
   companyId Int
   company   Company  @relation(fields: [companyId], references: [id])
+  transactions IncomeTransaction[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
 @@map("income")
+}
+
+model IncomeTransaction {
+  id            Int      @id @default(autoincrement())
+  date          DateTime @default(now())
+  incomeAmount  Float    @default(0)
+  paidAmount    Float    @default(0)
+  discount      Float    @default(0)
+  remark        String?
+  incomeId      Int
+  income        Income   @relation(fields: [incomeId], references: [id], onDelete: Cascade)
+  companyId     Int
+  company       Company  @relation(fields: [companyId], references: [id])
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+@@map("incometransaction")
 }
 
 model PaymentBook {
@@ -732,6 +756,8 @@ model CompanySetting {
   showAutoQuantity        Boolean   @default(false)
   showMultiLocation       Boolean   @default(false)
   showUnitSection         Boolean   @default(true)
+  primaryOpeningQty       Boolean   @default(false)
+  secOpeningQty           Boolean   @default(false)
   showBarcodeField        Boolean   @default(true)
   showPurchasePriceCode   Boolean   @default(true)
   purchasePriceMarkup     Float     @default(0)

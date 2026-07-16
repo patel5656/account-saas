@@ -120,6 +120,8 @@ exports.createInvoice = async (req, res) => {
               productId: parseInt(item.productId, 10),
               quantity: parseInt(item.quantity) || 0,
               freeQty: parseInt(item.freeQty) || 0,
+              primaryOpeningQty: parseFloat(item.primaryOpeningQty) || 0,
+              secOpeningQty: parseFloat(item.secOpeningQty) || 0,
               price: parseFloat(item.price) || 0,
               discount1: parseFloat(item.discount1) || 0,
               discount2: parseFloat(item.discount2) || 0,

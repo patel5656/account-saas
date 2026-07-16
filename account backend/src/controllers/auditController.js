@@ -4,9 +4,16 @@ const prisma = new PrismaClient();
 // GET /api/v1/audit-logs - tenant scoped audit log
 exports.getLogs = async (req, res) => {
   const companyId = req.user.companyId;
+  const role = req.user.role;
+
+  if (!companyId && role !== 'SUPERADMIN') {
+    return res.status(400).json({ success: false, message: 'Company ID is required' });
+  }
+
   try {
+    const whereClause = companyId ? { companyId } : {};
     const logs = await prisma.auditLog.findMany({
-      where: { companyId },
+      where: whereClause,
       orderBy: { createdAt: 'desc' },
     });
     

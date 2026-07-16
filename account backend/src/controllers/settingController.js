@@ -58,6 +58,7 @@ exports.updateSettings = async (req, res) => {
     // Optional: Filter out properties that are not allowed to be updated directly
     delete updates.id;
     delete updates.companyId;
+    delete updates.showIMEI; // Not in Prisma schema
 
     const updatedSettings = await prisma.companySetting.upsert({
       where: { companyId },

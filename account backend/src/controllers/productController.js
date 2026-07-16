@@ -8,16 +8,31 @@ exports.getProducts = async (req, res) => {
   const limit = parseInt(req.query.limit, 10) || 100000;
   const skip = (page - 1) * limit;
   try {
-    const [products, total] = await Promise.all([
+    const [products, total, unitConversions] = await Promise.all([
       prisma.product.findMany({ 
         where: { companyId, deletedAt: null }, 
         include: { attributeValues: true },
         skip, 
         take: limit 
       }),
-      prisma.product.count({ where: { companyId, deletedAt: null } })
+      prisma.product.count({ where: { companyId, deletedAt: null } }),
+      prisma.unitConversion.findMany({ where: { companyId } })
     ]);
-    res.status(200).json({ success: true, data: products, meta: { total, page, limit } });
+
+    const enrichedProducts = products.map(product => {
+      if (product.baseUnit && product.salesUnit) {
+        const conversion = unitConversions.find(c => 
+          c.baseUnit.toLowerCase() === product.baseUnit.toLowerCase() && 
+          c.targetUnit.toLowerCase() === product.salesUnit.toLowerCase()
+        );
+        if (conversion && conversion.baseQty > 0) {
+           return { ...product, conversionRate: conversion.targetQty / conversion.baseQty };
+        }
+      }
+      return product;
+    });
+
+    res.status(200).json({ success: true, data: enrichedProducts, meta: { total, page, limit } });
   } catch (error) {
     console.error(error);
     res.status(500).json({ success: false, message: 'Server error' });
@@ -31,7 +46,7 @@ exports.createProduct = async (req, res) => {
     name, sku, price, stock, mrp, barcode, category, brand, colorVariant, status,
     tax, hsnCode, purchasePrice, wholesalePrice, creditSalePrice, baseUnit, purchaseUnit, salesUnit,
     lowStockAlert, reorderLevel, enableBatch, enableExpiry, enableImei, hasBom, qtySlabs,
-    openingStockRate, warehouse, bomName, isMultiLevel, bomRecipe,
+    openingStockRate, secOpeningQty, asOfDate, warehouse, bomName, isMultiLevel, bomRecipe,
     syncOnline, onlineProductName, onlineProductDesc, onlineSalePrice, ecommerceCategory, productImage,
     commissionType, size, colour, expiryMonth, location, hindiName, description, termsCondition, productTags,
     rawMaterials, extraCharges, subItems, subInventory,
@@ -84,6 +99,8 @@ exports.createProduct = async (req, res) => {
         hasBom: Boolean(hasBom),
         qtySlabs: qtySlabs ? qtySlabs : undefined,
         openingStockRate: parseFloat(openingStockRate) || 0,
+        secOpeningQty: parseFloat(secOpeningQty) || 0,
+        asOfDate,
         warehouse,
         bomName,
         isMultiLevel: Boolean(isMultiLevel),
@@ -136,7 +153,7 @@ exports.updateProduct = async (req, res) => {
     name, sku, price, stock, mrp, barcode, category, brand, colorVariant, status,
     tax, hsnCode, purchasePrice, wholesalePrice, creditSalePrice, baseUnit, purchaseUnit, salesUnit,
     lowStockAlert, reorderLevel, enableBatch, enableExpiry, enableImei, hasBom, qtySlabs,
-    openingStockRate, warehouse, bomName, isMultiLevel, bomRecipe,
+    openingStockRate, secOpeningQty, asOfDate, warehouse, bomName, isMultiLevel, bomRecipe,
     syncOnline, onlineProductName, onlineProductDesc, onlineSalePrice, ecommerceCategory, productImage,
     commissionType, size, colour, expiryMonth, location, hindiName, description, termsCondition, productTags,
     rawMaterials, extraCharges, subItems, subInventory,
@@ -177,6 +194,8 @@ exports.updateProduct = async (req, res) => {
         ...(hasBom !== undefined && { hasBom: Boolean(hasBom) }),
         ...(qtySlabs !== undefined && { qtySlabs }),
         ...(openingStockRate !== undefined && { openingStockRate: parseFloat(openingStockRate) }),
+        ...(secOpeningQty !== undefined && { secOpeningQty: parseFloat(secOpeningQty) }),
+        ...(asOfDate !== undefined && { asOfDate }),
         ...(warehouse !== undefined && { warehouse }),
         ...(bomName !== undefined && { bomName }),
         ...(isMultiLevel !== undefined && { isMultiLevel: Boolean(isMultiLevel) }),
